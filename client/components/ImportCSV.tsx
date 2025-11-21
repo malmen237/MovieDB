@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { api } from '../api';
+import { IMPORT_SUCCESS_DELAY } from '../constants';
 
 interface ImportCSVProps {
   onComplete: () => void;
@@ -30,7 +31,7 @@ function ImportCSV({ onComplete }: ImportCSVProps) {
       if (data.success > 0) {
         setTimeout(() => {
           onComplete();
-        }, 3000);
+        }, IMPORT_SUCCESS_DELAY);
       }
     } catch (err) {
       setResult({

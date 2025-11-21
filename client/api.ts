@@ -24,16 +24,30 @@ export interface Stats {
   total: number;
 }
 
+export interface PaginatedResponse<T> {
+  data: T[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
+}
+
 export const api = {
   // Media operations
-  async getMedia(type?: string, search?: string): Promise<MediaItem[]> {
+  async getMedia(type?: string, search?: string, page?: number, limit?: number): Promise<MediaItem[]> {
     const params = new URLSearchParams();
     if (type) params.append('type', type);
     if (search) params.append('search', search);
+    if (page) params.append('page', page.toString());
+    if (limit) params.append('limit', limit.toString());
 
     const response = await fetch(`${API_BASE}/media?${params}`);
     if (!response.ok) throw new Error('Failed to fetch media');
-    return response.json();
+    const result: PaginatedResponse<MediaItem> = await response.json();
+    // For now, just return the data array (pagination can be added to UI later)
+    return result.data;
   },
 
   async getMediaById(id: number): Promise<MediaItem> {

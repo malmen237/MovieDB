@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { api, MediaItem } from '../api';
 import TMDBSearch from './TMDBSearch';
+import { FORM_SUCCESS_DELAY } from '../constants';
 
 interface MediaFormProps {
   item: MediaItem | null;
@@ -53,7 +54,7 @@ function MediaForm({ item, onSave, onCancel }: MediaFormProps) {
 
       setTimeout(() => {
         onSave();
-      }, 1000);
+      }, FORM_SUCCESS_DELAY);
     } catch (err) {
       setError('Failed to save item');
       console.error(err);

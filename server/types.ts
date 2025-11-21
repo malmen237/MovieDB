@@ -8,7 +8,7 @@ export interface MediaItem {
   format: 'bluray' | 'dvd' | 'other';
   productionYear: number;
   extras?: string;
-  partOf?: string; // e.g., "Lord of the Rings", "Marvel Cinematic Universe"
+  partOf?: string;
   tmdbId?: number;
   posterPath?: string;
   overview?: string;
@@ -31,4 +31,34 @@ export interface TMDBSearchResult {
 
 export interface TMDBResponse {
   results: TMDBSearchResult[];
+}
+
+export interface TMDBDetails {
+  id: number;
+  title?: string;
+  name?: string;
+  release_date?: string;
+  first_air_date?: string;
+  poster_path?: string;
+  overview?: string;
+  production_companies?: Array<{ id: number; name: string }>;
+  credits?: {
+    crew?: Array<{ job: string; name: string }>;
+  };
+}
+
+export interface PaginatedResponse<T> {
+  data: T[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
+}
+
+export interface Stats {
+  movies: number;
+  tvSeries: number;
+  total: number;
 }

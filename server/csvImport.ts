@@ -2,6 +2,8 @@ import { parse } from 'csv-parse';
 import { Readable } from 'stream';
 import { MediaItem } from './types';
 import { addMedia } from './database';
+import { MIN_YEAR, MAX_YEAR_OFFSET } from './constants';
+import logger from './logger';
 
 export interface CSVRow {
   type?: string;
@@ -50,7 +52,7 @@ export async function importCSV(fileContent: string): Promise<{ success: number;
           }
 
           const year = parseInt(row.productionYear || '0');
-          if (isNaN(year) || year < 1800 || year > new Date().getFullYear() + 5) {
+          if (isNaN(year) || year < MIN_YEAR || year > new Date().getFullYear() + MAX_YEAR_OFFSET) {
             errors.push(`Row has invalid production year: ${row.originalTitle}`);
             return;
           }
@@ -69,7 +71,9 @@ export async function importCSV(fileContent: string): Promise<{ success: number;
 
           results.push(mediaItem);
         } catch (error) {
-          errors.push(`Error parsing row: ${JSON.stringify(row)} - ${error}`);
+          const errorMsg = `Error parsing row: ${JSON.stringify(row)} - ${error}`;
+          errors.push(errorMsg);
+          logger.error('CSV row parsing error', { error, row });
         }
       })
       .on('end', () => {
@@ -80,14 +84,18 @@ export async function importCSV(fileContent: string): Promise<{ success: number;
             addMedia(item);
             successCount++;
           } catch (error) {
-            errors.push(`Error adding ${item.originalTitle}: ${error}`);
+            const errorMsg = `Error adding ${item.originalTitle}: ${error}`;
+            errors.push(errorMsg);
+            logger.error('CSV import database error', { error, item });
           }
         }
 
         resolve({ success: successCount, errors });
       })
       .on('error', (error) => {
-        errors.push(`CSV parsing error: ${error.message}`);
+        const errorMsg = `CSV parsing error: ${error.message}`;
+        errors.push(errorMsg);
+        logger.error('CSV parsing error', { error });
         resolve({ success: 0, errors });
       });
   });

@@ -1,6 +1,8 @@
 import Database from 'better-sqlite3';
 import path from 'path';
-import { MediaItem } from './types';
+import { MediaItem, PaginatedResponse } from './types';
+import { DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE } from './constants';
+import logger from './logger';
 
 const db = new Database(path.join(__dirname, '../moviedb.db'));
 
@@ -32,109 +34,168 @@ export function initDatabase() {
   `);
 }
 
-// Get all media items
-export function getAllMedia(type?: string, search?: string): MediaItem[] {
-  let query = 'SELECT * FROM media WHERE 1=1';
-  const params: any[] = [];
+// Get all media items with pagination
+export function getAllMedia(
+  type?: string,
+  search?: string,
+  page: number = 1,
+  limit: number = DEFAULT_PAGE_SIZE
+): PaginatedResponse<MediaItem> {
+  try {
+    // Validate and sanitize pagination params
+    const safePage = Math.max(1, page);
+    const safeLimit = Math.min(Math.max(1, limit), MAX_PAGE_SIZE);
+    const offset = (safePage - 1) * safeLimit;
 
-  if (type && (type === 'movie' || type === 'tv-series')) {
-    query += ' AND type = ?';
-    params.push(type);
+    // Build query
+    let query = 'SELECT * FROM media WHERE 1=1';
+    let countQuery = 'SELECT COUNT(*) as total FROM media WHERE 1=1';
+    const params: (string | number)[] = [];
+
+    if (type && (type === 'movie' || type === 'tv-series')) {
+      query += ' AND type = ?';
+      countQuery += ' AND type = ?';
+      params.push(type);
+    }
+
+    if (search) {
+      query += ' AND (originalTitle LIKE ? OR swedishTitle LIKE ? OR partOf LIKE ?)';
+      countQuery += ' AND (originalTitle LIKE ? OR swedishTitle LIKE ? OR partOf LIKE ?)';
+      const searchParam = `%${search}%`;
+      params.push(searchParam, searchParam, searchParam);
+    }
+
+    query += ' ORDER BY originalTitle ASC LIMIT ? OFFSET ?';
+
+    // Get total count
+    const countStmt = db.prepare(countQuery);
+    const { total } = countStmt.get(...params) as { total: number };
+
+    // Get paginated results
+    const stmt = db.prepare(query);
+    const data = stmt.all(...params, safeLimit, offset) as MediaItem[];
+
+    return {
+      data,
+      pagination: {
+        page: safePage,
+        limit: safeLimit,
+        total,
+        totalPages: Math.ceil(total / safeLimit)
+      }
+    };
+  } catch (error) {
+    logger.error('Database error in getAllMedia', { error, type, search, page, limit });
+    throw new Error('Failed to retrieve media items');
   }
-
-  if (search) {
-    query += ' AND (originalTitle LIKE ? OR swedishTitle LIKE ? OR partOf LIKE ?)';
-    const searchParam = `%${search}%`;
-    params.push(searchParam, searchParam, searchParam);
-  }
-
-  query += ' ORDER BY originalTitle ASC';
-
-  const stmt = db.prepare(query);
-  return stmt.all(...params) as MediaItem[];
 }
 
 // Get media item by ID
 export function getMediaById(id: number): MediaItem | undefined {
-  const stmt = db.prepare('SELECT * FROM media WHERE id = ?');
-  return stmt.get(id) as MediaItem | undefined;
+  try {
+    const stmt = db.prepare('SELECT * FROM media WHERE id = ?');
+    return stmt.get(id) as MediaItem | undefined;
+  } catch (error) {
+    logger.error('Database error in getMediaById', { error, id });
+    throw new Error('Failed to retrieve media item');
+  }
 }
 
 // Add new media item
 export function addMedia(item: MediaItem): number {
-  const stmt = db.prepare(`
-    INSERT INTO media (
-      type, originalTitle, swedishTitle, company, director,
-      format, productionYear, extras, partOf, tmdbId, posterPath, overview
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `);
+  try {
+    const stmt = db.prepare(`
+      INSERT INTO media (
+        type, originalTitle, swedishTitle, company, director,
+        format, productionYear, extras, partOf, tmdbId, posterPath, overview
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
 
-  const result = stmt.run(
-    item.type,
-    item.originalTitle,
-    item.swedishTitle || null,
-    item.company || null,
-    item.director || null,
-    item.format,
-    item.productionYear,
-    item.extras || null,
-    item.partOf || null,
-    item.tmdbId || null,
-    item.posterPath || null,
-    item.overview || null
-  );
+    const result = stmt.run(
+      item.type,
+      item.originalTitle,
+      item.swedishTitle || null,
+      item.company || null,
+      item.director || null,
+      item.format,
+      item.productionYear,
+      item.extras || null,
+      item.partOf || null,
+      item.tmdbId || null,
+      item.posterPath || null,
+      item.overview || null
+    );
 
-  return result.lastInsertRowid as number;
+    return result.lastInsertRowid as number;
+  } catch (error) {
+    logger.error('Database error in addMedia', { error, item });
+    throw new Error('Failed to add media item');
+  }
 }
 
 // Update media item
 export function updateMedia(id: number, item: Partial<MediaItem>): boolean {
-  const fields: string[] = [];
-  const values: any[] = [];
+  try {
+    const fields: string[] = [];
+    const values: (string | number | null | undefined)[] = [];
 
-  const allowedFields = [
-    'type', 'originalTitle', 'swedishTitle', 'company', 'director',
-    'format', 'productionYear', 'extras', 'partOf', 'tmdbId', 'posterPath', 'overview'
-  ];
+    const allowedFields = [
+      'type', 'originalTitle', 'swedishTitle', 'company', 'director',
+      'format', 'productionYear', 'extras', 'partOf', 'tmdbId', 'posterPath', 'overview'
+    ] as const;
 
-  for (const [key, value] of Object.entries(item)) {
-    if (allowedFields.includes(key)) {
-      fields.push(`${key} = ?`);
-      values.push(value);
+    for (const [key, value] of Object.entries(item)) {
+      if (allowedFields.includes(key as typeof allowedFields[number])) {
+        fields.push(`${key} = ?`);
+        values.push(value);
+      }
     }
+
+    if (fields.length === 0) {
+      return false;
+    }
+
+    fields.push('updatedAt = CURRENT_TIMESTAMP');
+    values.push(id);
+
+    const stmt = db.prepare(`UPDATE media SET ${fields.join(', ')} WHERE id = ?`);
+    const result = stmt.run(...values);
+
+    return result.changes > 0;
+  } catch (error) {
+    logger.error('Database error in updateMedia', { error, id, item });
+    throw new Error('Failed to update media item');
   }
-
-  if (fields.length === 0) {
-    return false;
-  }
-
-  fields.push('updatedAt = CURRENT_TIMESTAMP');
-  values.push(id);
-
-  const stmt = db.prepare(`UPDATE media SET ${fields.join(', ')} WHERE id = ?`);
-  const result = stmt.run(...values);
-
-  return result.changes > 0;
 }
 
 // Delete media item
 export function deleteMedia(id: number): boolean {
-  const stmt = db.prepare('DELETE FROM media WHERE id = ?');
-  const result = stmt.run(id);
-  return result.changes > 0;
+  try {
+    const stmt = db.prepare('DELETE FROM media WHERE id = ?');
+    const result = stmt.run(id);
+    return result.changes > 0;
+  } catch (error) {
+    logger.error('Database error in deleteMedia', { error, id });
+    throw new Error('Failed to delete media item');
+  }
 }
 
 // Get statistics
 export function getStats() {
-  const movieCount = db.prepare('SELECT COUNT(*) as count FROM media WHERE type = ?').get('movie') as { count: number };
-  const tvCount = db.prepare('SELECT COUNT(*) as count FROM media WHERE type = ?').get('tv-series') as { count: number };
-  const totalCount = db.prepare('SELECT COUNT(*) as count FROM media').get() as { count: number };
+  try {
+    const movieCount = db.prepare('SELECT COUNT(*) as count FROM media WHERE type = ?').get('movie') as { count: number };
+    const tvCount = db.prepare('SELECT COUNT(*) as count FROM media WHERE type = ?').get('tv-series') as { count: number };
+    const totalCount = db.prepare('SELECT COUNT(*) as count FROM media').get() as { count: number };
 
-  return {
-    movies: movieCount.count,
-    tvSeries: tvCount.count,
-    total: totalCount.count
-  };
+    return {
+      movies: movieCount.count,
+      tvSeries: tvCount.count,
+      total: totalCount.count
+    };
+  } catch (error) {
+    logger.error('Database error in getStats', { error });
+    throw new Error('Failed to retrieve statistics');
+  }
 }
 
 export default db;

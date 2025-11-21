@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { api, MediaItem, Stats } from './api';
 import MediaList from './components/MediaList';
 import MediaForm from './components/MediaForm';
@@ -15,7 +15,7 @@ function App() {
   const [error, setError] = useState<string | null>(null);
   const [editingItem, setEditingItem] = useState<MediaItem | null>(null);
 
-  const loadMedia = async () => {
+  const loadMedia = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
@@ -28,21 +28,21 @@ function App() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [view, search]);
 
-  const loadStats = async () => {
+  const loadStats = useCallback(async () => {
     try {
       const stats = await api.getStats();
       setStats(stats);
     } catch (err) {
       console.error('Failed to load stats:', err);
     }
-  };
+  }, []);
 
   useEffect(() => {
     loadMedia();
     loadStats();
-  }, [view, search]);
+  }, [loadMedia, loadStats]);
 
   const handleDelete = async (id: number) => {
     if (!confirm('Are you sure you want to delete this item?')) return;
