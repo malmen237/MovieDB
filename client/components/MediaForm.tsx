@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { api, MediaItem } from '../api';
+import { TMDBSearchResult } from '../../shared/types';
 import TMDBSearch from './TMDBSearch';
 
 interface MediaFormProps {
@@ -60,13 +61,14 @@ function MediaForm({ item, onSave, onCancel }: MediaFormProps) {
     }
   };
 
-  const handleTMDBSelect = (tmdbData: any) => {
+  const handleTMDBSelect = (tmdbData: TMDBSearchResult) => {
+    const yearString = tmdbData.release_date || tmdbData.first_air_date || '';
+    const year = yearString ? parseInt(yearString.substring(0, 4)) : formData.productionYear;
+
     setFormData({
       ...formData,
       originalTitle: tmdbData.title || tmdbData.name || formData.originalTitle,
-      productionYear: parseInt(
-        (tmdbData.release_date || tmdbData.first_air_date || '').substring(0, 4)
-      ) || formData.productionYear,
+      productionYear: !isNaN(year as number) ? year : formData.productionYear,
       overview: tmdbData.overview || formData.overview,
       posterPath: tmdbData.poster_path || formData.posterPath,
       tmdbId: tmdbData.id

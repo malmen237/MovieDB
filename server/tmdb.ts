@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { TMDBResponse, TMDBSearchResult } from './types';
+import { TMDBResponse, TMDBSearchResult, TMDBDetails } from './types';
 
 // TMDB API configuration
 // Users should get their own API key from https://www.themoviedb.org/settings/api
@@ -33,13 +33,13 @@ export async function searchTMDB(query: string, type?: 'movie' | 'tv'): Promise<
   }
 }
 
-export async function getTMDBDetails(id: number, type: 'movie' | 'tv'): Promise<any> {
+export async function getTMDBDetails(id: number, type: 'movie' | 'tv'): Promise<TMDBDetails | null> {
   if (!TMDB_API_KEY) {
     return null;
   }
 
   try {
-    const response = await axios.get(`${TMDB_BASE_URL}/${type}/${id}`, {
+    const response = await axios.get<TMDBDetails>(`${TMDB_BASE_URL}/${type}/${id}`, {
       params: {
         api_key: TMDB_API_KEY,
         language: 'en-US'

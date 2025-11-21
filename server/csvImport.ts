@@ -1,7 +1,7 @@
 import { parse } from 'csv-parse';
 import { Readable } from 'stream';
 import { MediaItem } from './types';
-import { addMedia } from './database';
+import { addMediaBatch } from './database';
 
 export interface CSVRow {
   type?: string;
@@ -73,18 +73,16 @@ export async function importCSV(fileContent: string): Promise<{ success: number;
         }
       })
       .on('end', () => {
-        // Insert all valid items into database
-        let successCount = 0;
-        for (const item of results) {
-          try {
-            addMedia(item);
-            successCount++;
-          } catch (error) {
-            errors.push(`Error adding ${item.originalTitle}: ${error}`);
-          }
+        // Insert all valid items into database using batch insert with transaction
+        // This ensures atomicity - either all valid items are inserted or none
+        if (results.length > 0) {
+          const batchResult = addMediaBatch(results);
+          // Merge batch insert errors with parsing errors
+          errors.push(...batchResult.errors);
+          resolve({ success: batchResult.success, errors });
+        } else {
+          resolve({ success: 0, errors });
         }
-
-        resolve({ success: successCount, errors });
       })
       .on('error', (error) => {
         errors.push(`CSV parsing error: ${error.message}`);

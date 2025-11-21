@@ -1,28 +1,8 @@
+import { MediaItem, Stats, TMDBSearchResult, TMDBDetails } from '../shared/types';
+
+export type { MediaItem, Stats };
+
 const API_BASE = '/api';
-
-export interface MediaItem {
-  id?: number;
-  type: 'movie' | 'tv-series';
-  originalTitle: string;
-  swedishTitle?: string;
-  company?: string;
-  director?: string;
-  format: 'bluray' | 'dvd' | 'other';
-  productionYear: number;
-  extras?: string;
-  partOf?: string;
-  tmdbId?: number;
-  posterPath?: string;
-  overview?: string;
-  createdAt?: string;
-  updatedAt?: string;
-}
-
-export interface Stats {
-  movies: number;
-  tvSeries: number;
-  total: number;
-}
 
 export const api = {
   // Media operations

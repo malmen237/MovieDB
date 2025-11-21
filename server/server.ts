@@ -14,16 +14,37 @@ import {
 import { searchTMDB, getTMDBDetails } from './tmdb';
 import { importCSV } from './csvImport';
 import { MediaItem } from './types';
+import { validateMediaItem, validateId, sanitizeSearchQuery } from './validation';
+import { generalRateLimiter, writeRateLimiter, importRateLimiter, tmdbRateLimiter } from './rateLimit';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-// Configure multer for file uploads
-const upload = multer({ storage: multer.memoryStorage() });
+// Configure multer for file uploads with size limits
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 10 * 1024 * 1024, // 10MB limit
+    files: 1
+  }
+});
 
 // Middleware
-app.use(cors());
-app.use(express.json());
+// CORS configuration - restrict in production
+const corsOptions = {
+  origin: process.env.NODE_ENV === 'production'
+    ? process.env.ALLOWED_ORIGINS?.split(',') || 'http://localhost:3001'
+    : '*',
+  methods: ['GET', 'POST', 'PUT', 'DELETE'],
+  allowedHeaders: ['Content-Type']
+};
+app.use(cors(corsOptions));
+
+// Body parser with size limit to prevent DoS
+app.use(express.json({ limit: '1mb' }));
+
+// Apply general rate limiting to all API routes
+app.use('/api', generalRateLimiter.middleware());
 
 // Initialize database
 initDatabase();
@@ -38,7 +59,17 @@ app.get('/api/media', (req: Request, res: Response) => {
   try {
     const type = req.query.type as string | undefined;
     const search = req.query.search as string | undefined;
-    const items = getAllMedia(type, search);
+
+    // Validate type parameter
+    if (type && !['movie', 'tv-series'].includes(type)) {
+      res.status(400).json({ error: 'Type must be "movie" or "tv-series"' });
+      return;
+    }
+
+    // Sanitize search query
+    const sanitizedSearch = search ? sanitizeSearchQuery(search) : undefined;
+
+    const items = getAllMedia(type, sanitizedSearch);
     res.json(items);
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch media items' });
@@ -48,6 +79,13 @@ app.get('/api/media', (req: Request, res: Response) => {
 // Get single media item
 app.get('/api/media/:id', (req: Request, res: Response) => {
   try {
+    // Validate ID
+    const validation = validateId(req.params.id);
+    if (!validation.isValid) {
+      res.status(400).json({ error: 'Invalid ID', details: validation.errors });
+      return;
+    }
+
     const id = parseInt(req.params.id);
     const item = getMediaById(id);
     if (item) {
@@ -61,13 +99,17 @@ app.get('/api/media/:id', (req: Request, res: Response) => {
 });
 
 // Add new media item
-app.post('/api/media', (req: Request, res: Response) => {
+app.post('/api/media', writeRateLimiter.middleware(), (req: Request, res: Response) => {
   try {
     const item: MediaItem = req.body;
 
-    // Validate required fields
-    if (!item.originalTitle || !item.type || !item.format || !item.productionYear) {
-      res.status(400).json({ error: 'Missing required fields' });
+    // Comprehensive validation
+    const validation = validateMediaItem(item, false);
+    if (!validation.isValid) {
+      res.status(400).json({
+        error: 'Validation failed',
+        details: validation.errors
+      });
       return;
     }
 
@@ -80,10 +122,27 @@ app.post('/api/media', (req: Request, res: Response) => {
 });
 
 // Update media item
-app.put('/api/media/:id', (req: Request, res: Response) => {
+app.put('/api/media/:id', writeRateLimiter.middleware(), (req: Request, res: Response) => {
   try {
+    // Validate ID
+    const idValidation = validateId(req.params.id);
+    if (!idValidation.isValid) {
+      res.status(400).json({ error: 'Invalid ID', details: idValidation.errors });
+      return;
+    }
+
     const id = parseInt(req.params.id);
     const item: Partial<MediaItem> = req.body;
+
+    // Validate item data (for updates, required fields are not enforced)
+    const validation = validateMediaItem(item, true);
+    if (!validation.isValid) {
+      res.status(400).json({
+        error: 'Validation failed',
+        details: validation.errors
+      });
+      return;
+    }
 
     const success = updateMedia(id, item);
     if (success) {
@@ -98,8 +157,15 @@ app.put('/api/media/:id', (req: Request, res: Response) => {
 });
 
 // Delete media item
-app.delete('/api/media/:id', (req: Request, res: Response) => {
+app.delete('/api/media/:id', writeRateLimiter.middleware(), (req: Request, res: Response) => {
   try {
+    // Validate ID
+    const validation = validateId(req.params.id);
+    if (!validation.isValid) {
+      res.status(400).json({ error: 'Invalid ID', details: validation.errors });
+      return;
+    }
+
     const id = parseInt(req.params.id);
     const success = deleteMedia(id);
     if (success) {
@@ -123,13 +189,24 @@ app.get('/api/stats', (req: Request, res: Response) => {
 });
 
 // Search TMDB
-app.get('/api/tmdb/search', async (req: Request, res: Response) => {
+app.get('/api/tmdb/search', tmdbRateLimiter.middleware(), async (req: Request, res: Response) => {
   try {
     const query = req.query.q as string;
     const type = req.query.type as 'movie' | 'tv' | undefined;
 
-    if (!query) {
+    if (!query || query.trim().length === 0) {
       res.status(400).json({ error: 'Query parameter required' });
+      return;
+    }
+
+    if (query.length > 200) {
+      res.status(400).json({ error: 'Query must be less than 200 characters' });
+      return;
+    }
+
+    // Validate type if provided
+    if (type && !['movie', 'tv'].includes(type)) {
+      res.status(400).json({ error: 'Type must be "movie" or "tv"' });
       return;
     }
 
@@ -141,16 +218,23 @@ app.get('/api/tmdb/search', async (req: Request, res: Response) => {
 });
 
 // Get TMDB details
-app.get('/api/tmdb/:type/:id', async (req: Request, res: Response) => {
+app.get('/api/tmdb/:type/:id', tmdbRateLimiter.middleware(), async (req: Request, res: Response) => {
   try {
     const type = req.params.type as 'movie' | 'tv';
-    const id = parseInt(req.params.id);
 
     if (!['movie', 'tv'].includes(type)) {
       res.status(400).json({ error: 'Type must be movie or tv' });
       return;
     }
 
+    // Validate ID
+    const validation = validateId(req.params.id);
+    if (!validation.isValid) {
+      res.status(400).json({ error: 'Invalid ID', details: validation.errors });
+      return;
+    }
+
+    const id = parseInt(req.params.id);
     const details = await getTMDBDetails(id, type);
     if (details) {
       res.json(details);
@@ -163,10 +247,22 @@ app.get('/api/tmdb/:type/:id', async (req: Request, res: Response) => {
 });
 
 // Import CSV
-app.post('/api/import/csv', upload.single('file'), async (req: Request, res: Response) => {
+app.post('/api/import/csv', importRateLimiter.middleware(), upload.single('file'), async (req: Request, res: Response) => {
   try {
     if (!req.file) {
       res.status(400).json({ error: 'No file uploaded' });
+      return;
+    }
+
+    // Validate file type
+    if (!req.file.originalname.toLowerCase().endsWith('.csv')) {
+      res.status(400).json({ error: 'Only CSV files are allowed' });
+      return;
+    }
+
+    // Validate file size (already limited by multer, but double-check)
+    if (req.file.size > 10 * 1024 * 1024) {
+      res.status(400).json({ error: 'File size must be less than 10MB' });
       return;
     }
 
@@ -179,7 +275,11 @@ app.post('/api/import/csv', upload.single('file'), async (req: Request, res: Res
       errors: result.errors
     });
   } catch (error) {
-    res.status(500).json({ error: 'Failed to import CSV' });
+    if (error instanceof Error && error.message.includes('File too large')) {
+      res.status(413).json({ error: 'File too large. Maximum size is 10MB' });
+    } else {
+      res.status(500).json({ error: 'Failed to import CSV' });
+    }
   }
 });
 

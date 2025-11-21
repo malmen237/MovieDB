@@ -35,7 +35,7 @@ export function initDatabase() {
 // Get all media items
 export function getAllMedia(type?: string, search?: string): MediaItem[] {
   let query = 'SELECT * FROM media WHERE 1=1';
-  const params: any[] = [];
+  const params: (string | number)[] = [];
 
   if (type && (type === 'movie' || type === 'tv-series')) {
     query += ' AND type = ?';
@@ -87,20 +87,83 @@ export function addMedia(item: MediaItem): number {
   return result.lastInsertRowid as number;
 }
 
+// Batch insert media items with transaction support
+// This ensures all-or-nothing behavior - either all items are inserted or none are
+export function addMediaBatch(items: MediaItem[]): { success: number; errors: string[] } {
+  const errors: string[] = [];
+  let successCount = 0;
+
+  // Prepare the insert statement once
+  const stmt = db.prepare(`
+    INSERT INTO media (
+      type, originalTitle, swedishTitle, company, director,
+      format, productionYear, extras, partOf, tmdbId, posterPath, overview
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+
+  // Use transaction for atomic batch insert
+  const insertMany = db.transaction((itemsToInsert: MediaItem[]) => {
+    for (const item of itemsToInsert) {
+      try {
+        stmt.run(
+          item.type,
+          item.originalTitle,
+          item.swedishTitle || null,
+          item.company || null,
+          item.director || null,
+          item.format,
+          item.productionYear,
+          item.extras || null,
+          item.partOf || null,
+          item.tmdbId || null,
+          item.posterPath || null,
+          item.overview || null
+        );
+        successCount++;
+      } catch (error) {
+        // Collect errors but continue transaction
+        errors.push(`Error adding ${item.originalTitle}: ${error}`);
+      }
+    }
+  });
+
+  try {
+    // Execute the transaction
+    insertMany(items);
+  } catch (error) {
+    errors.push(`Transaction error: ${error}`);
+    return { success: 0, errors };
+  }
+
+  return { success: successCount, errors };
+}
+
 // Update media item
 export function updateMedia(id: number, item: Partial<MediaItem>): boolean {
   const fields: string[] = [];
-  const values: any[] = [];
+  const values: (string | number | null)[] = [];
 
-  const allowedFields = [
-    'type', 'originalTitle', 'swedishTitle', 'company', 'director',
-    'format', 'productionYear', 'extras', 'partOf', 'tmdbId', 'posterPath', 'overview'
-  ];
+  // Explicit whitelist mapping to prevent SQL injection
+  const allowedFields: Record<string, boolean> = {
+    'type': true,
+    'originalTitle': true,
+    'swedishTitle': true,
+    'company': true,
+    'director': true,
+    'format': true,
+    'productionYear': true,
+    'extras': true,
+    'partOf': true,
+    'tmdbId': true,
+    'posterPath': true,
+    'overview': true
+  };
 
   for (const [key, value] of Object.entries(item)) {
-    if (allowedFields.includes(key)) {
+    // Strict validation: only allow whitelisted fields
+    if (allowedFields[key] === true) {
       fields.push(`${key} = ?`);
-      values.push(value);
+      values.push(value ?? null);
     }
   }
 

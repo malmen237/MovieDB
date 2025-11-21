@@ -1,15 +1,16 @@
 import { useState } from 'react';
 import { api } from '../api';
+import { TMDBSearchResult } from '../../shared/types';
 
 interface TMDBSearchProps {
   type?: string;
-  onSelect: (data: any) => void;
+  onSelect: (data: TMDBSearchResult) => void;
   onClose: () => void;
 }
 
 function TMDBSearch({ type, onSelect, onClose }: TMDBSearchProps) {
   const [query, setQuery] = useState('');
-  const [results, setResults] = useState<any[]>([]);
+  const [results, setResults] = useState<TMDBSearchResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedId, setSelectedId] = useState<number | null>(null);
 
@@ -29,7 +30,7 @@ function TMDBSearch({ type, onSelect, onClose }: TMDBSearchProps) {
     }
   };
 
-  const handleSelect = (result: any) => {
+  const handleSelect = (result: TMDBSearchResult) => {
     setSelectedId(result.id);
     onSelect(result);
   };
