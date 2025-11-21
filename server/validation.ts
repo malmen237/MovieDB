@@ -107,20 +107,20 @@ export function validateMediaItem(item: Partial<MediaItem>, isUpdate: boolean = 
 /**
  * Validates pagination parameters
  */
-export function validatePaginationParams(limit?: any, offset?: any): ValidationResult {
+export function validatePaginationParams(page?: any, limit?: any): ValidationResult {
   const errors: ValidationError[] = [];
 
-  if (limit !== undefined) {
-    const limitNum = parseInt(limit);
-    if (isNaN(limitNum) || limitNum < 1 || limitNum > 1000) {
-      errors.push({ field: 'limit', message: 'Limit must be between 1 and 1000' });
+  if (page !== undefined) {
+    const pageNum = parseInt(page);
+    if (isNaN(pageNum) || pageNum < 1) {
+      errors.push({ field: 'page', message: 'Page must be a positive integer' });
     }
   }
 
-  if (offset !== undefined) {
-    const offsetNum = parseInt(offset);
-    if (isNaN(offsetNum) || offsetNum < 0) {
-      errors.push({ field: 'offset', message: 'Offset must be a non-negative number' });
+  if (limit !== undefined) {
+    const limitNum = parseInt(limit);
+    if (isNaN(limitNum) || limitNum < 1 || limitNum > 200) {
+      errors.push({ field: 'limit', message: 'Limit must be between 1 and 200' });
     }
   }
 

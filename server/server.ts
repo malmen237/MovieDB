@@ -5,6 +5,7 @@ import path from 'path';
 import {
   initDatabase,
   getAllMedia,
+  getMediaPaginated,
   getMediaById,
   addMedia,
   updateMedia,
@@ -14,7 +15,7 @@ import {
 import { searchTMDB, getTMDBDetails } from './tmdb';
 import { importCSV } from './csvImport';
 import { MediaItem } from './types';
-import { validateMediaItem, validateId, sanitizeSearchQuery } from './validation';
+import { validateMediaItem, validateId, sanitizeSearchQuery, validatePaginationParams } from './validation';
 import { generalRateLimiter, writeRateLimiter, importRateLimiter, tmdbRateLimiter } from './rateLimit';
 
 const app = express();
@@ -54,11 +55,13 @@ app.get('/api/health', (req: Request, res: Response) => {
   res.json({ status: 'ok', message: 'Movie Database API is running' });
 });
 
-// Get all media items
+// Get all media items (with pagination)
 app.get('/api/media', (req: Request, res: Response) => {
   try {
     const type = req.query.type as string | undefined;
     const search = req.query.search as string | undefined;
+    const pageParam = req.query.page as string | undefined;
+    const limitParam = req.query.limit as string | undefined;
 
     // Validate type parameter
     if (type && !['movie', 'tv-series'].includes(type)) {
@@ -66,11 +69,22 @@ app.get('/api/media', (req: Request, res: Response) => {
       return;
     }
 
+    // Validate pagination parameters
+    const paginationValidation = validatePaginationParams(pageParam, limitParam);
+    if (!paginationValidation.isValid) {
+      res.status(400).json({ error: 'Invalid pagination parameters', details: paginationValidation.errors });
+      return;
+    }
+
+    // Parse pagination params with defaults
+    const page = pageParam ? parseInt(pageParam) : 1;
+    const limit = limitParam ? parseInt(limitParam) : 50;
+
     // Sanitize search query
     const sanitizedSearch = search ? sanitizeSearchQuery(search) : undefined;
 
-    const items = getAllMedia(type, sanitizedSearch);
-    res.json(items);
+    const result = getMediaPaginated(type, sanitizedSearch, page, limit);
+    res.json(result);
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch media items' });
   }

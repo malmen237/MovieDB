@@ -1,15 +1,17 @@
-import { MediaItem, Stats, TMDBSearchResult, TMDBDetails } from '../shared/types';
+import { MediaItem, Stats, TMDBSearchResult, TMDBDetails, PaginatedResult } from '../shared/types';
 
-export type { MediaItem, Stats };
+export type { MediaItem, Stats, PaginatedResult };
 
 const API_BASE = '/api';
 
 export const api = {
   // Media operations
-  async getMedia(type?: string, search?: string): Promise<MediaItem[]> {
+  async getMedia(type?: string, search?: string, page?: number, limit?: number): Promise<PaginatedResult<MediaItem>> {
     const params = new URLSearchParams();
     if (type) params.append('type', type);
     if (search) params.append('search', search);
+    if (page) params.append('page', page.toString());
+    if (limit) params.append('limit', limit.toString());
 
     const response = await fetch(`${API_BASE}/media?${params}`);
     if (!response.ok) throw new Error('Failed to fetch media');

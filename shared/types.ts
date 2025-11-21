@@ -56,3 +56,14 @@ export interface Stats {
   tvSeries: number;
   total: number;
 }
+
+export interface PaginatedResult<T> {
+  data: T[];
+  pagination: {
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+    hasMore: boolean;
+  };
+}

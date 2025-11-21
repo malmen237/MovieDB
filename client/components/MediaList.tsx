@@ -5,9 +5,18 @@ interface MediaListProps {
   loading: boolean;
   onDelete: (id: number) => void;
   onEdit: (item: MediaItem) => void;
+  pagination: {
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+    hasMore: boolean;
+  };
+  currentPage: number;
+  onPageChange: (page: number) => void;
 }
 
-function MediaList({ media, loading, onDelete, onEdit }: MediaListProps) {
+function MediaList({ media, loading, onDelete, onEdit, pagination, currentPage, onPageChange }: MediaListProps) {
   if (loading) {
     return <div className="loading">Loading...</div>;
   }
@@ -21,10 +30,57 @@ function MediaList({ media, loading, onDelete, onEdit }: MediaListProps) {
     );
   }
 
+  // Generate page numbers to display
+  const getPageNumbers = () => {
+    const pages = [];
+    const maxPagesToShow = 7;
+    const { totalPages } = pagination;
+
+    if (totalPages <= maxPagesToShow) {
+      // Show all pages if there are few enough
+      for (let i = 1; i <= totalPages; i++) {
+        pages.push(i);
+      }
+    } else {
+      // Always show first page
+      pages.push(1);
+
+      // Calculate range around current page
+      let start = Math.max(2, currentPage - 2);
+      let end = Math.min(totalPages - 1, currentPage + 2);
+
+      // Add ellipsis if needed
+      if (start > 2) {
+        pages.push('...');
+      }
+
+      // Add pages around current
+      for (let i = start; i <= end; i++) {
+        pages.push(i);
+      }
+
+      // Add ellipsis if needed
+      if (end < totalPages - 1) {
+        pages.push('...');
+      }
+
+      // Always show last page
+      pages.push(totalPages);
+    }
+
+    return pages;
+  };
+
   return (
-    <div className="media-grid">
-      {media.map((item) => (
-        <div key={item.id} className="media-card">
+    <>
+      {/* Pagination info */}
+      <div style={{ marginBottom: '20px', color: '#666', fontSize: '0.95rem' }}>
+        Showing {((currentPage - 1) * pagination.limit) + 1} to {Math.min(currentPage * pagination.limit, pagination.total)} of {pagination.total} items
+      </div>
+
+      <div className="media-grid">
+        {media.map((item) => (
+          <div key={item.id} className="media-card">
           <div className="media-card-header">
             {item.posterPath && (
               <img
@@ -76,7 +132,45 @@ function MediaList({ media, loading, onDelete, onEdit }: MediaListProps) {
           </div>
         </div>
       ))}
-    </div>
+      </div>
+
+      {/* Pagination controls */}
+      {pagination.totalPages > 1 && (
+        <div className="pagination">
+          <button
+            className="pagination-btn"
+            onClick={() => onPageChange(currentPage - 1)}
+            disabled={currentPage === 1}
+          >
+            ← Previous
+          </button>
+
+          <div className="pagination-numbers">
+            {getPageNumbers().map((page, index) => (
+              typeof page === 'number' ? (
+                <button
+                  key={index}
+                  className={`pagination-btn ${currentPage === page ? 'active' : ''}`}
+                  onClick={() => onPageChange(page)}
+                >
+                  {page}
+                </button>
+              ) : (
+                <span key={index} className="pagination-ellipsis">{page}</span>
+              )
+            ))}
+          </div>
+
+          <button
+            className="pagination-btn"
+            onClick={() => onPageChange(currentPage + 1)}
+            disabled={!pagination.hasMore}
+          >
+            Next →
+          </button>
+        </div>
+      )}
+    </>
   );
 }
 

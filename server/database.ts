@@ -1,6 +1,6 @@
 import Database from 'better-sqlite3';
 import path from 'path';
-import { MediaItem } from './types';
+import { MediaItem, PaginatedResult } from './types';
 
 const db = new Database(path.join(__dirname, '../moviedb.db'));
 
@@ -32,7 +32,7 @@ export function initDatabase() {
   `);
 }
 
-// Get all media items
+// Get all media items (legacy - for backwards compatibility)
 export function getAllMedia(type?: string, search?: string): MediaItem[] {
   let query = 'SELECT * FROM media WHERE 1=1';
   const params: (string | number)[] = [];
@@ -52,6 +52,54 @@ export function getAllMedia(type?: string, search?: string): MediaItem[] {
 
   const stmt = db.prepare(query);
   return stmt.all(...params) as MediaItem[];
+}
+
+// Get media items with pagination
+export function getMediaPaginated(
+  type?: string,
+  search?: string,
+  page: number = 1,
+  limit: number = 50
+): PaginatedResult<MediaItem> {
+  // Build the WHERE clause
+  let whereClause = 'WHERE 1=1';
+  const params: (string | number)[] = [];
+
+  if (type && (type === 'movie' || type === 'tv-series')) {
+    whereClause += ' AND type = ?';
+    params.push(type);
+  }
+
+  if (search) {
+    whereClause += ' AND (originalTitle LIKE ? OR swedishTitle LIKE ? OR partOf LIKE ?)';
+    const searchParam = `%${search}%`;
+    params.push(searchParam, searchParam, searchParam);
+  }
+
+  // Get total count
+  const countQuery = `SELECT COUNT(*) as count FROM media ${whereClause}`;
+  const countStmt = db.prepare(countQuery);
+  const { count } = countStmt.get(...params) as { count: number };
+
+  // Calculate pagination values
+  const totalPages = Math.ceil(count / limit);
+  const offset = (page - 1) * limit;
+
+  // Get paginated data
+  const dataQuery = `SELECT * FROM media ${whereClause} ORDER BY originalTitle ASC LIMIT ? OFFSET ?`;
+  const dataStmt = db.prepare(dataQuery);
+  const data = dataStmt.all(...params, limit, offset) as MediaItem[];
+
+  return {
+    data,
+    pagination: {
+      total: count,
+      page,
+      limit,
+      totalPages,
+      hasMore: page < totalPages
+    }
+  };
 }
 
 // Get media item by ID

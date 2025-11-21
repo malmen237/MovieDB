@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { api, MediaItem, Stats } from './api';
+import { api, MediaItem, Stats, PaginatedResult } from './api';
 import MediaList from './components/MediaList';
 import MediaForm from './components/MediaForm';
 import ImportCSV from './components/ImportCSV';
@@ -14,14 +14,24 @@ function App() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [editingItem, setEditingItem] = useState<MediaItem | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pagination, setPagination] = useState({
+    total: 0,
+    page: 1,
+    limit: 50,
+    totalPages: 0,
+    hasMore: false
+  });
 
-  const loadMedia = async () => {
+  const loadMedia = async (page: number = currentPage) => {
     try {
       setLoading(true);
       setError(null);
       const type = view === 'movies' ? 'movie' : view === 'tv-series' ? 'tv-series' : undefined;
-      const items = await api.getMedia(type, search);
-      setMedia(items);
+      const result = await api.getMedia(type, search, page, 50);
+      setMedia(result.data);
+      setPagination(result.pagination);
+      setCurrentPage(page);
     } catch (err) {
       setError('Failed to load media items');
       console.error(err);
@@ -40,7 +50,8 @@ function App() {
   };
 
   useEffect(() => {
-    loadMedia();
+    setCurrentPage(1); // Reset to page 1 when view or search changes
+    loadMedia(1);
     loadStats();
   }, [view, search]);
 
@@ -173,6 +184,9 @@ function App() {
               loading={loading}
               onDelete={handleDelete}
               onEdit={handleEdit}
+              pagination={pagination}
+              currentPage={currentPage}
+              onPageChange={(page) => loadMedia(page)}
             />
           </>
         )}
