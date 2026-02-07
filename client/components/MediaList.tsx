@@ -5,9 +5,30 @@ interface MediaListProps {
   loading: boolean;
   onDelete: (id: number) => void;
   onEdit: (item: MediaItem) => void;
+  onDismissTmdb: (id: number) => void;
 }
 
-function MediaList({ media, loading, onDelete, onEdit }: MediaListProps) {
+function SeasonBadges({ seasons, totalSeasons }: { seasons?: string; totalSeasons?: number }) {
+  const owned = new Set(
+    (seasons || '').split(',').filter(Boolean).map(Number)
+  );
+  const total = totalSeasons || Math.max(...owned, 0);
+  if (total === 0) return null;
+
+  const allSeasons = Array.from({ length: total }, (_, i) => i + 1);
+
+  return (
+    <div className="season-badges">
+      {allSeasons.map(s => (
+        <span key={s} className={`season-badge ${owned.has(s) ? 'owned' : 'missing'}`}>
+          S{s}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+function MediaList({ media, loading, onDelete, onEdit, onDismissTmdb }: MediaListProps) {
   if (loading) {
     return <div className="loading">Loading...</div>;
   }
@@ -24,7 +45,7 @@ function MediaList({ media, loading, onDelete, onEdit }: MediaListProps) {
   return (
     <div className="media-grid">
       {media.map((item) => (
-        <div key={item.id} className="media-card">
+        <div key={item.id} id={`media-${item.id}`} className="media-card">
           <div className="media-card-header">
             {item.posterPath && (
               <img
@@ -52,22 +73,9 @@ function MediaList({ media, loading, onDelete, onEdit }: MediaListProps) {
             {item.director && <p><strong>Director:</strong> {item.director}</p>}
             {item.company && <p><strong>Company:</strong> {item.company}</p>}
             {item.partOf && <p><strong>Part of:</strong> {item.partOf}</p>}
-            {item.type === 'tv-series' && (item.seasons || item.totalSeasons) && (() => {
-              const owned = new Set(
-                (item.seasons || '').split(',').filter(Boolean).map(Number)
-              );
-              const total = item.totalSeasons || Math.max(...owned, 0);
-              const allSeasons = Array.from({ length: total }, (_, i) => i + 1);
-              return (
-                <div className="season-badges">
-                  {allSeasons.map(s => (
-                    <span key={s} className={`season-badge ${owned.has(s) ? 'owned' : 'missing'}`}>
-                      S{s}
-                    </span>
-                  ))}
-                </div>
-              );
-            })()}
+            {item.type === 'tv-series' && (item.seasons || item.totalSeasons) && (
+              <SeasonBadges seasons={item.seasons} totalSeasons={item.totalSeasons} />
+            )}
             {item.extras && <p><strong>Extras:</strong> {item.extras}</p>}
             {item.overview && (
               <p><strong>Overview:</strong> {item.overview.length > 200 ? item.overview.slice(0, 200) + '...' : item.overview}</p>
@@ -81,6 +89,14 @@ function MediaList({ media, loading, onDelete, onEdit }: MediaListProps) {
             >
               Edit
             </button>
+            {item.tmdbId && item.tmdbId > 0 && (
+              <button
+                className="btn btn-secondary"
+                onClick={() => onDismissTmdb(item.id!)}
+              >
+                Dismiss
+              </button>
+            )}
             <button
               className="btn btn-danger"
               onClick={() => onDelete(item.id!)}

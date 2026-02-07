@@ -1,5 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
-import { api, MediaItem, Stats, getCurrentUser, setCurrentUser } from './api';
+import { api, MediaItem, getCurrentUser, setCurrentUser } from './api';
+import { TMDB_REJECTED_ID } from '../shared/types';
+import { useDebounce } from './hooks/useDebounce';
+import { useMediaData } from './hooks/useMediaData';
+import { useEnrichmentStream } from './hooks/useEnrichmentStream';
 import MediaList from './components/MediaList';
 import MediaForm from './components/MediaForm';
 import ImportCSV from './components/ImportCSV';
@@ -8,59 +12,29 @@ type View = 'all' | 'movies' | 'tv-series' | 'add' | 'csv';
 
 function App() {
   const [view, setView] = useState<View>('all');
-  const [media, setMedia] = useState<MediaItem[]>([]);
-  const [stats, setStats] = useState<Stats>({ movies: 0, tvSeries: 0, total: 0 });
   const [search, setSearch] = useState('');
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const debouncedSearch = useDebounce(search);
   const [editingItem, setEditingItem] = useState<MediaItem | null>(null);
+  const [previousView, setPreviousView] = useState<View>('all');
+  const scrollTargetId = useRef<number | null>(null);
   const [user, setUser] = useState(getCurrentUser());
-  const [enrichStatus, setEnrichStatus] = useState<{ type: string; processed: number; total: number } | null>(null);
   const [addMenuOpen, setAddMenuOpen] = useState(false);
   const userInputRef = useRef<HTMLInputElement>(null);
   const addMenuRef = useRef<HTMLDivElement>(null);
 
-  const loadMedia = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const type = view === 'movies' ? 'movie' : view === 'tv-series' ? 'tv-series' : undefined;
-      const items = await api.getMedia(type, search);
-      setMedia(items);
-    } catch (err) {
-      setError('Failed to load media items');
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const { media, stats, loading, error, setError, refresh } = useMediaData(view, debouncedSearch, user);
 
-  const loadStats = async () => {
-    try {
-      const stats = await api.getStats();
-      setStats(stats);
-    } catch (err) {
-      console.error('Failed to load stats:', err);
-    }
-  };
+  const enrichStatus = useEnrichmentStream(refresh);
 
   useEffect(() => {
-    loadMedia();
-    loadStats();
-  }, [view, search, user]);
-
-  useEffect(() => {
-    const eventSource = new EventSource('/api/enrich/stream');
-    eventSource.onmessage = (e) => {
-      const event = JSON.parse(e.data);
-      setEnrichStatus(event);
-      if (event.type === 'done') {
-        loadMedia();
-        loadStats();
+    if (!loading && scrollTargetId.current !== null) {
+      const el = document.getElementById(`media-${scrollTargetId.current}`);
+      if (el) {
+        el.scrollIntoView({ behavior: 'instant', block: 'center' });
       }
-    };
-    return () => eventSource.close();
-  }, []);
+      scrollTargetId.current = null;
+    }
+  }, [loading, media]);
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -77,29 +51,42 @@ function App() {
 
     try {
       await api.deleteMedia(id);
-      await loadMedia();
-      await loadStats();
+      await refresh();
     } catch (err) {
       setError('Failed to delete item');
       console.error(err);
     }
   };
 
+  const handleDismissTmdb = async (id: number) => {
+    try {
+      await api.updateMedia(id, { tmdbId: TMDB_REJECTED_ID, posterPath: '', overview: '' });
+      await refresh();
+    } catch (err) {
+      setError('Failed to dismiss TMDB match');
+      console.error(err);
+    }
+  };
+
   const handleEdit = (item: MediaItem) => {
+    setPreviousView(view as View);
     setEditingItem(item);
     setView('add');
   };
 
   const handleSave = async () => {
+    const itemId = editingItem?.id ?? null;
     setEditingItem(null);
-    setView('all');
-    await loadMedia();
-    await loadStats();
+    setView(previousView);
+    scrollTargetId.current = itemId;
+    await refresh();
   };
 
   const handleCancel = () => {
+    const itemId = editingItem?.id ?? null;
     setEditingItem(null);
-    setView('all');
+    setView(previousView);
+    scrollTargetId.current = itemId;
   };
 
   const applyUser = () => {
@@ -111,8 +98,7 @@ function App() {
   };
 
   const handleImportComplete = async () => {
-    await loadMedia();
-    await loadStats();
+    await refresh();
     setView('all');
   };
 
@@ -230,6 +216,7 @@ function App() {
               loading={loading}
               onDelete={handleDelete}
               onEdit={handleEdit}
+              onDismissTmdb={handleDismissTmdb}
             />
           </>
         )}

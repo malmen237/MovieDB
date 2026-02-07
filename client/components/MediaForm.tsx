@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { api, MediaItem } from '../api';
+import { api, MediaItem, TMDBSearchResult } from '../api';
 import TMDBSearch from './TMDBSearch';
 
 interface MediaFormProps {
@@ -63,16 +63,17 @@ function MediaForm({ item, onSave, onCancel }: MediaFormProps) {
         setSuccess('Item added successfully!');
       }
 
+      const SUCCESS_REDIRECT_MS = 1000;
       setTimeout(() => {
         onSave();
-      }, 1000);
+      }, SUCCESS_REDIRECT_MS);
     } catch (err) {
       setError('Failed to save item');
       console.error(err);
     }
   };
 
-  const handleTMDBSelect = (tmdbData: any) => {
+  const handleTMDBSelect = (tmdbData: TMDBSearchResult) => {
     setFormData({
       ...formData,
       originalTitle: tmdbData.title || tmdbData.name || formData.originalTitle,

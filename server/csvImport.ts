@@ -1,6 +1,6 @@
 import { parse } from 'csv-parse';
 import { Readable } from 'stream';
-import { MediaItem } from './types';
+import { MediaItem } from '../shared/types';
 import { addMedia } from './database';
 
 function detectDelimiter(content: string): string {
@@ -42,9 +42,11 @@ function parseTVSeriesRow(cols: string[], userId: string): MediaItem | null {
   const title = (cols[0] || '').trim();
   if (!title) return null;
 
-  const seasons = cols.slice(1)
-    .map((c, i) => (c || '').trim() ? i + 1 : null)
-    .filter((s): s is number => s !== null);
+  const seasonSet = new Set<number>();
+  cols.slice(1).forEach((c, i) => {
+    if ((c || '').trim()) seasonSet.add(i + 1);
+  });
+  const seasons = Array.from(seasonSet).sort((a, b) => a - b);
 
   return {
     userId,
@@ -58,6 +60,10 @@ function parseTVSeriesRow(cols: string[], userId: string): MediaItem | null {
 }
 
 export async function importCSV(fileContent: string, userId: string, csvFormat: string = 'movies'): Promise<{ success: number; errors: string[] }> {
+  if (!fileContent.trim()) {
+    return { success: 0, errors: ['File is empty'] };
+  }
+
   const results: MediaItem[] = [];
   const errors: string[] = [];
   const delimiter = detectDelimiter(fileContent);

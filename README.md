@@ -6,8 +6,13 @@ A full-stack TypeScript application for managing your personal movie and TV seri
 
 - **Add Movies and TV Series**: Manually add items with detailed information
 - **TMDB Integration**: Search and auto-fill information from The Movie Database
-- **CSV Import**: Bulk import your collection from Excel/CSV files
-- **Search and Filter**: Find items by title, collection, type (movie/TV series)
+- **Automatic TMDB Enrichment**: Newly added items are automatically matched and enriched with poster, overview, and season data in the background
+- **Dismiss Bad Matches**: Reject incorrect TMDB matches to prevent re-enrichment
+- **TV Series Season Tracking**: Track which seasons you own vs. total available seasons
+- **CSV Import/Export**: Bulk import and export your collection as CSV, with separate formats for movies and TV series
+- **Multi-User Support**: Switch between users to manage separate collections
+- **Search and Filter**: Find items by title, collection, or type (movie/TV series)
+- **Statistics Dashboard**: View counts of movies, TV series, and total items
 - **Track Details**:
   - Original and Swedish titles
   - Director and production company
@@ -15,7 +20,6 @@ A full-stack TypeScript application for managing your personal movie and TV seri
   - Production year
   - Special features/extras
   - Collection membership (e.g., "Lord of the Rings trilogy")
-- **Statistics Dashboard**: View counts of movies, TV series, and total items
 
 ## Prerequisites
 

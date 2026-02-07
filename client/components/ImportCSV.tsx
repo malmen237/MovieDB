@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { api } from '../api';
+import { api, ImportResult } from '../api';
 
 interface ImportCSVProps {
   onComplete: () => void;
@@ -8,9 +8,19 @@ interface ImportCSVProps {
 function ImportCSV({ onComplete }: ImportCSVProps) {
   const [file, setFile] = useState<File | null>(null);
   const [importing, setImporting] = useState(false);
-  const [result, setResult] = useState<any>(null);
+  const [result, setResult] = useState<ImportResult | null>(null);
   const [csvFormat, setCsvFormat] = useState<'movies' | 'tv-series'>('movies');
   const [exportStatus, setExportStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+
+  const handleExport = async (exportFn: () => Promise<void>, successMsg: string, errorMsg: string) => {
+    setExportStatus(null);
+    try {
+      await exportFn();
+      setExportStatus({ type: 'success', message: successMsg });
+    } catch {
+      setExportStatus({ type: 'error', message: errorMsg });
+    }
+  };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -29,13 +39,15 @@ function ImportCSV({ onComplete }: ImportCSVProps) {
       const data = await api.importCSV(file, csvFormat);
       setResult(data);
 
+      const IMPORT_COMPLETE_REDIRECT_MS = 3000;
       if (data.success > 0) {
         setTimeout(() => {
           onComplete();
-        }, 3000);
+        }, IMPORT_COMPLETE_REDIRECT_MS);
       }
     } catch (err) {
       setResult({
+        message: 'Import failed',
         success: 0,
         errors: ['Failed to import CSV file']
       });
@@ -146,7 +158,7 @@ function ImportCSV({ onComplete }: ImportCSVProps) {
             <div className="import-info-box">
               <p><strong>Errors:</strong></p>
               <ul>
-                {result.errors.map((error: string, index: number) => (
+                {result.errors.map((error, index) => (
                   <li key={index}>{error}</li>
                 ))}
               </ul>
@@ -159,29 +171,13 @@ function ImportCSV({ onComplete }: ImportCSVProps) {
         <div className="form-actions">
           <button
             className="btn btn-primary"
-            onClick={async () => {
-              setExportStatus(null);
-              try {
-                await api.exportMoviesCSV();
-                setExportStatus({ type: 'success', message: 'Movies CSV exported!' });
-              } catch {
-                setExportStatus({ type: 'error', message: 'Failed to export movies.' });
-              }
-            }}
+            onClick={() => handleExport(api.exportMoviesCSV, 'Movies CSV exported!', 'Failed to export movies.')}
           >
             Export Movies CSV
           </button>
           <button
             className="btn btn-primary"
-            onClick={async () => {
-              setExportStatus(null);
-              try {
-                await api.exportTVSeriesCSV();
-                setExportStatus({ type: 'success', message: 'TV Series CSV exported!' });
-              } catch {
-                setExportStatus({ type: 'error', message: 'Failed to export TV series.' });
-              }
-            }}
+            onClick={() => handleExport(api.exportTVSeriesCSV, 'TV Series CSV exported!', 'Failed to export TV series.')}
           >
             Export TV Series CSV
           </button>

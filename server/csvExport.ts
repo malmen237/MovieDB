@@ -1,4 +1,4 @@
-import { MediaItem } from './types';
+import { MediaItem } from '../shared/types';
 
 export function exportMoviesCSV(items: MediaItem[]): string {
   const rows = items.map(item => {

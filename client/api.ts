@@ -1,3 +1,7 @@
+import type { MediaItem, Stats, TMDBSearchResult, TMDBDetailsResult, ImportResult } from '../shared/types';
+
+export type { MediaItem, Stats, TMDBSearchResult, TMDBDetailsResult, ImportResult };
+
 const API_BASE = '/api';
 
 let currentUser = 'linda';
@@ -12,33 +16,6 @@ export function getCurrentUser(): string {
 
 function userHeaders(): Record<string, string> {
   return { 'X-User': currentUser };
-}
-
-export interface MediaItem {
-  id?: number;
-  userId?: string;
-  type: 'movie' | 'tv-series';
-  originalTitle: string;
-  swedishTitle?: string;
-  company?: string;
-  director?: string;
-  format: 'bluray' | 'dvd' | 'other';
-  productionYear: number;
-  extras?: string;
-  seasons?: string;
-  totalSeasons?: number;
-  partOf?: string;
-  tmdbId?: number;
-  posterPath?: string;
-  overview?: string;
-  createdAt?: string;
-  updatedAt?: string;
-}
-
-export interface Stats {
-  movies: number;
-  tvSeries: number;
-  total: number;
 }
 
 export const api = {
@@ -98,7 +75,7 @@ export const api = {
     return response.json();
   },
 
-  async searchTMDB(query: string, type?: 'movie' | 'tv') {
+  async searchTMDB(query: string, type?: 'movie' | 'tv'): Promise<TMDBSearchResult[]> {
     const params = new URLSearchParams({ q: query });
     if (type) params.append('type', type);
 
@@ -107,7 +84,7 @@ export const api = {
     return response.json();
   },
 
-  async getTMDBDetails(id: number, type: 'movie' | 'tv') {
+  async getTMDBDetails(id: number, type: 'movie' | 'tv'): Promise<TMDBDetailsResult> {
     const response = await fetch(`${API_BASE}/tmdb/${type}/${id}`);
     if (!response.ok) throw new Error('Failed to fetch TMDB details');
     return response.json();
@@ -127,7 +104,7 @@ export const api = {
     a.href = url;
     a.download = 'movies.csv';
     a.click();
-    URL.revokeObjectURL(url);
+    setTimeout(() => URL.revokeObjectURL(url), 100);
   },
 
   async exportTVSeriesCSV() {
@@ -144,10 +121,10 @@ export const api = {
     a.href = url;
     a.download = 'tv-series.csv';
     a.click();
-    URL.revokeObjectURL(url);
+    setTimeout(() => URL.revokeObjectURL(url), 100);
   },
 
-  async importCSV(file: File, csvFormat: 'movies' | 'tv-series' = 'movies') {
+  async importCSV(file: File, csvFormat: 'movies' | 'tv-series' = 'movies'): Promise<ImportResult> {
     const formData = new FormData();
     formData.append('file', file);
     formData.append('csvFormat', csvFormat);

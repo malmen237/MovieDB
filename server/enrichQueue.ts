@@ -1,15 +1,13 @@
 import { getUnenrichedMedia, updateMedia, getUsersWithUnenrichedMedia, getTVSeriesMissingTotalSeasons } from './database';
 import { searchTMDB, getTMDBDetails } from './tmdb';
-import { MediaItem } from './types';
+import { MediaItem, EnrichEvent } from '../shared/types';
 
 type Listener = (event: EnrichEvent) => void;
 
-export interface EnrichEvent {
-  type: 'progress' | 'done' | 'idle';
-  processed: number;
-  total: number;
-  currentTitle?: string;
-}
+const TMDB_RATE_LIMIT_MS = 300;
+const NUDGE_DELAY_MS = 100;
+const STARTUP_DRAIN_DELAY_MS = 1000;
+const STARTUP_BACKFILL_DELAY_MS = 2000;
 
 const listeners = new Set<Listener>();
 const pendingUsers = new Set<string>();
@@ -24,6 +22,8 @@ function broadcast(event: EnrichEvent) {
 }
 
 async function applyMatch(item: MediaItem, results: Awaited<ReturnType<typeof searchTMDB>>) {
+  if (!item.id) return;
+
   const match = item.productionYear > 0
     ? results.find(r => {
         const date = r.release_date || r.first_air_date || '';
@@ -50,7 +50,7 @@ async function applyMatch(item: MediaItem, results: Awaited<ReturnType<typeof se
     }
   }
 
-  updateMedia(item.userId, item.id!, updates);
+  updateMedia(item.userId, item.id, updates);
 }
 
 async function drain() {
@@ -75,7 +75,7 @@ async function drain() {
       await applyMatch(item, results);
 
       processed++;
-      await new Promise(resolve => setTimeout(resolve, 300));
+      await new Promise(resolve => setTimeout(resolve, TMDB_RATE_LIMIT_MS));
     }
 
     broadcast({ type: 'done', processed, total });
@@ -87,23 +87,31 @@ async function drain() {
 
 export function nudgeQueue(userId: string) {
   pendingUsers.add(userId);
-  setTimeout(drain, 100);
+  setTimeout(drain, NUDGE_DELAY_MS);
 }
 
 async function backfillTotalSeasons() {
-  const items = getTVSeriesMissingTotalSeasons();
-  if (items.length === 0) return;
+  try {
+    const items = getTVSeriesMissingTotalSeasons();
+    if (items.length === 0) return;
 
-  console.log(`Backfilling totalSeasons for ${items.length} TV series...`);
-  for (const item of items) {
-    if (!item.tmdbId) continue;
-    const details = await getTMDBDetails(item.tmdbId, 'tv');
-    if (details?.number_of_seasons) {
-      updateMedia(item.userId, item.id!, { totalSeasons: details.number_of_seasons });
+    console.log(`Backfilling totalSeasons for ${items.length} TV series...`);
+    for (const item of items) {
+      if (!item.tmdbId || !item.id) continue;
+      try {
+        const details = await getTMDBDetails(item.tmdbId, 'tv');
+        if (details?.number_of_seasons) {
+          updateMedia(item.userId, item.id, { totalSeasons: details.number_of_seasons });
+        }
+      } catch (err) {
+        console.error(`Failed to backfill ${item.originalTitle}:`, err);
+      }
+      await new Promise(resolve => setTimeout(resolve, TMDB_RATE_LIMIT_MS));
     }
-    await new Promise(resolve => setTimeout(resolve, 300));
+    console.log('Backfill complete.');
+  } catch (err) {
+    console.error('Backfill failed:', err);
   }
-  console.log('Backfill complete.');
 }
 
 export function startQueue() {
@@ -112,9 +120,9 @@ export function startQueue() {
     pendingUsers.add(userId);
   }
   if (pendingUsers.size > 0) {
-    setTimeout(drain, 1000);
+    setTimeout(drain, STARTUP_DRAIN_DELAY_MS);
   }
-  setTimeout(backfillTotalSeasons, 2000);
+  setTimeout(backfillTotalSeasons, STARTUP_BACKFILL_DELAY_MS);
 }
 
 export function subscribe(listener: Listener) {

@@ -15,7 +15,7 @@ import {
 import { searchTMDB, getTMDBDetails } from './tmdb';
 import { importCSV } from './csvImport';
 import { exportMoviesCSV, exportTVSeriesCSV } from './csvExport';
-import { MediaItem } from './types';
+import { MediaItem } from '../shared/types';
 import { nudgeQueue, startQueue, subscribe } from './enrichQueue';
 
 declare global {
@@ -29,7 +29,8 @@ declare global {
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-const upload = multer({ storage: multer.memoryStorage() });
+const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024;
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: MAX_FILE_SIZE_BYTES } });
 
 app.use(cors());
 app.use(express.json());

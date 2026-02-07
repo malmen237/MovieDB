@@ -1,8 +1,16 @@
 import Database from 'better-sqlite3';
 import path from 'path';
-import { MediaItem } from './types';
+import { MediaItem } from '../shared/types';
 
-const db = new Database(path.join(__dirname, '../moviedb.db'));
+type SqlParam = string | number | null;
+
+const ALLOWED_UPDATE_FIELDS = new Set([
+  'type', 'originalTitle', 'swedishTitle', 'company', 'director',
+  'format', 'productionYear', 'extras', 'seasons', 'totalSeasons',
+  'partOf', 'tmdbId', 'posterPath', 'overview',
+]);
+
+const db = new Database(path.join(__dirname, '..', 'moviedb.db'));
 
 export function initDatabase() {
   db.exec(`
@@ -63,7 +71,7 @@ export function initDatabase() {
 
 export function getAllMedia(userId: string, type?: string, search?: string): MediaItem[] {
   let query = 'SELECT * FROM media WHERE userId = ?';
-  const params: any[] = [userId];
+  const params: SqlParam[] = [userId];
 
   if (type && (type === 'movie' || type === 'tv-series')) {
     query += ' AND type = ?';
@@ -117,29 +125,25 @@ export function addMedia(item: MediaItem): number {
 }
 
 export function updateMedia(userId: string, id: number, item: Partial<MediaItem>): boolean {
-  const fields: string[] = [];
-  const values: any[] = [];
-
-  const allowedFields = [
-    'type', 'originalTitle', 'swedishTitle', 'company', 'director',
-    'format', 'productionYear', 'extras', 'seasons', 'totalSeasons', 'partOf', 'tmdbId', 'posterPath', 'overview'
-  ];
+  const setClauses: string[] = [];
+  const values: SqlParam[] = [];
 
   for (const [key, value] of Object.entries(item)) {
-    if (allowedFields.includes(key)) {
-      fields.push(`${key} = ?`);
-      values.push(value);
+    if (ALLOWED_UPDATE_FIELDS.has(key)) {
+      setClauses.push(`${key} = ?`);
+      values.push(value as SqlParam);
     }
   }
 
-  if (fields.length === 0) {
+  if (setClauses.length === 0) {
     return false;
   }
 
-  fields.push('updatedAt = CURRENT_TIMESTAMP');
+  setClauses.push('updatedAt = CURRENT_TIMESTAMP');
   values.push(id, userId);
 
-  const stmt = db.prepare(`UPDATE media SET ${fields.join(', ')} WHERE id = ? AND userId = ?`);
+  const sql = `UPDATE media SET ${setClauses.join(', ')} WHERE id = ? AND userId = ?`;
+  const stmt = db.prepare(sql);
   const result = stmt.run(...values);
 
   return result.changes > 0;
@@ -175,7 +179,7 @@ export function getUsersWithUnenrichedMedia(): string[] {
 
 export function getTVSeriesMissingTotalSeasons(): MediaItem[] {
   const stmt = db.prepare(
-    `SELECT * FROM media WHERE type = 'tv-series' AND tmdbId IS NOT NULL AND totalSeasons IS NULL`
+    `SELECT * FROM media WHERE type = 'tv-series' AND tmdbId IS NOT NULL AND tmdbId > 0 AND totalSeasons IS NULL`
   );
   return stmt.all() as MediaItem[];
 }

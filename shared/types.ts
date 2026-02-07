@@ -1,3 +1,5 @@
+export const TMDB_REJECTED_ID = -1;
+
 export interface MediaItem {
   id?: number;
   userId: string;
@@ -11,7 +13,7 @@ export interface MediaItem {
   extras?: string;
   seasons?: string;
   totalSeasons?: number;
-  partOf?: string; // e.g., "Lord of the Rings", "Marvel Cinematic Universe"
+  partOf?: string;
   tmdbId?: number;
   posterPath?: string;
   overview?: string;
@@ -34,4 +36,35 @@ export interface TMDBSearchResult {
 
 export interface TMDBResponse {
   results: TMDBSearchResult[];
+}
+
+export interface TMDBDetailsResult {
+  id: number;
+  title?: string;
+  name?: string;
+  overview?: string;
+  poster_path?: string;
+  release_date?: string;
+  first_air_date?: string;
+  number_of_seasons?: number;
+  genres?: { id: number; name: string }[];
+}
+
+export interface Stats {
+  movies: number;
+  tvSeries: number;
+  total: number;
+}
+
+export interface EnrichEvent {
+  type: 'progress' | 'done' | 'idle';
+  processed: number;
+  total: number;
+  currentTitle?: string;
+}
+
+export interface ImportResult {
+  message: string;
+  success: number;
+  errors: string[];
 }

@@ -1,20 +1,20 @@
-import { useState, useEffect } from 'react';
-import { api } from '../api';
+import { useState, useEffect, useCallback } from 'react';
+import { api, TMDBSearchResult } from '../api';
 
 interface TMDBSearchProps {
   type?: string;
   initialQuery?: string;
-  onSelect: (data: any) => void;
+  onSelect: (data: TMDBSearchResult) => void;
   onClose: () => void;
 }
 
 function TMDBSearch({ type, initialQuery, onSelect, onClose }: TMDBSearchProps) {
   const [query, setQuery] = useState(initialQuery || '');
-  const [results, setResults] = useState<any[]>([]);
+  const [results, setResults] = useState<TMDBSearchResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedId, setSelectedId] = useState<number | null>(null);
 
-  const search = async (searchQuery: string) => {
+  const search = useCallback(async (searchQuery: string) => {
     if (!searchQuery.trim()) return;
     setLoading(true);
     try {
@@ -26,18 +26,18 @@ function TMDBSearch({ type, initialQuery, onSelect, onClose }: TMDBSearchProps) 
     } finally {
       setLoading(false);
     }
-  };
+  }, [type]);
 
   useEffect(() => {
     if (initialQuery) search(initialQuery);
-  }, []);
+  }, [initialQuery, search]);
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
     search(query);
   };
 
-  const handleSelect = (result: any) => {
+  const handleSelect = (result: TMDBSearchResult) => {
     setSelectedId(result.id);
     onSelect(result);
   };
