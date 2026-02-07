@@ -3,21 +3,65 @@ import { Readable } from 'stream';
 import { MediaItem } from './types';
 import { addMedia } from './database';
 
-export interface CSVRow {
-  type?: string;
-  originalTitle?: string;
-  swedishTitle?: string;
-  company?: string;
-  director?: string;
-  format?: string;
-  productionYear?: string;
-  extras?: string;
-  partOf?: string;
+function detectDelimiter(content: string): string {
+  const firstLine = content.split('\n')[0] || '';
+  const semicolons = (firstLine.match(/;/g) || []).length;
+  const commas = (firstLine.match(/,/g) || []).length;
+  return semicolons > commas ? ';' : ',';
 }
 
-export async function importCSV(fileContent: string): Promise<{ success: number; errors: string[] }> {
+function parseMovieRow(cols: string[], userId: string): MediaItem | null {
+  const swedishTitle = (cols[0] || '').trim();
+  const notesCol = (cols[1] || '').trim();
+  const originalTitle = (cols[2] || '').trim();
+  const yearStr = (cols[3] || '').trim();
+
+  if (!originalTitle && !swedishTitle) return null;
+
+  const title = originalTitle || swedishTitle;
+  const swedish = swedishTitle || originalTitle;
+
+  const year = parseInt(yearStr);
+  const validYear = !isNaN(year) && year >= 1800 && year <= new Date().getFullYear() + 5;
+
+  const isBluray = notesCol === 'BR' || notesCol.startsWith('BR ') || notesCol.startsWith('BR,');
+  const extras = isBluray ? notesCol.replace(/^BR[, ]*/, '').trim() : notesCol;
+
+  return {
+    userId,
+    type: 'movie',
+    originalTitle: title,
+    swedishTitle: swedish,
+    format: isBluray ? 'bluray' : 'dvd',
+    productionYear: validYear ? year : 0,
+    extras: extras || undefined
+  };
+}
+
+function parseTVSeriesRow(cols: string[], userId: string): MediaItem | null {
+  const title = (cols[0] || '').trim();
+  if (!title) return null;
+
+  const seasons = cols.slice(1)
+    .map((c, i) => (c || '').trim() ? i + 1 : null)
+    .filter((s): s is number => s !== null);
+
+  return {
+    userId,
+    type: 'tv-series',
+    originalTitle: title,
+    swedishTitle: title,
+    format: 'dvd',
+    productionYear: 0,
+    seasons: seasons.length > 0 ? seasons.join(',') : undefined
+  };
+}
+
+export async function importCSV(fileContent: string, userId: string, csvFormat: string = 'movies'): Promise<{ success: number; errors: string[] }> {
   const results: MediaItem[] = [];
   const errors: string[] = [];
+  const delimiter = detectDelimiter(fileContent);
+  const parseRow = csvFormat === 'tv-series' ? parseTVSeriesRow : parseMovieRow;
 
   return new Promise((resolve) => {
     const stream = Readable.from([fileContent]);
@@ -25,55 +69,23 @@ export async function importCSV(fileContent: string): Promise<{ success: number;
     stream
       .pipe(
         parse({
-          columns: true,
+          columns: false,
+          delimiter,
           skip_empty_lines: true,
           trim: true,
-          bom: true
+          bom: true,
+          relax_column_count: true
         })
       )
-      .on('data', (row: CSVRow) => {
+      .on('data', (cols: string[]) => {
         try {
-          // Validate required fields
-          if (!row.originalTitle) {
-            errors.push(`Row missing originalTitle: ${JSON.stringify(row)}`);
-            return;
-          }
-
-          if (!row.type || !['movie', 'tv-series'].includes(row.type.toLowerCase())) {
-            errors.push(`Row has invalid type (must be 'movie' or 'tv-series'): ${row.originalTitle}`);
-            return;
-          }
-
-          if (!row.format || !['bluray', 'dvd', 'other'].includes(row.format.toLowerCase())) {
-            errors.push(`Row has invalid format (must be 'bluray', 'dvd', or 'other'): ${row.originalTitle}`);
-            return;
-          }
-
-          const year = parseInt(row.productionYear || '0');
-          if (isNaN(year) || year < 1800 || year > new Date().getFullYear() + 5) {
-            errors.push(`Row has invalid production year: ${row.originalTitle}`);
-            return;
-          }
-
-          const mediaItem: MediaItem = {
-            type: row.type.toLowerCase() as 'movie' | 'tv-series',
-            originalTitle: row.originalTitle,
-            swedishTitle: row.swedishTitle || undefined,
-            company: row.company || undefined,
-            director: row.director || undefined,
-            format: row.format.toLowerCase() as 'bluray' | 'dvd' | 'other',
-            productionYear: year,
-            extras: row.extras || undefined,
-            partOf: row.partOf || undefined
-          };
-
-          results.push(mediaItem);
+          const item = parseRow(cols, userId);
+          if (item) results.push(item);
         } catch (error) {
-          errors.push(`Error parsing row: ${JSON.stringify(row)} - ${error}`);
+          errors.push(`Error parsing row: ${JSON.stringify(cols)} - ${error}`);
         }
       })
       .on('end', () => {
-        // Insert all valid items into database
         let successCount = 0;
         for (const item of results) {
           try {

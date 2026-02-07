@@ -1,32 +1,40 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { api } from '../api';
 
 interface TMDBSearchProps {
   type?: string;
+  initialQuery?: string;
   onSelect: (data: any) => void;
   onClose: () => void;
 }
 
-function TMDBSearch({ type, onSelect, onClose }: TMDBSearchProps) {
-  const [query, setQuery] = useState('');
+function TMDBSearch({ type, initialQuery, onSelect, onClose }: TMDBSearchProps) {
+  const [query, setQuery] = useState(initialQuery || '');
   const [results, setResults] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedId, setSelectedId] = useState<number | null>(null);
 
-  const handleSearch = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!query.trim()) return;
-
+  const search = async (searchQuery: string) => {
+    if (!searchQuery.trim()) return;
     setLoading(true);
     try {
       const searchType = type === 'tv-series' ? 'tv' : type === 'movie' ? 'movie' : undefined;
-      const data = await api.searchTMDB(query, searchType);
+      const data = await api.searchTMDB(searchQuery, searchType);
       setResults(data);
     } catch (err) {
       console.error('Search failed:', err);
     } finally {
       setLoading(false);
     }
+  };
+
+  useEffect(() => {
+    if (initialQuery) search(initialQuery);
+  }, []);
+
+  const handleSearch = async (e: React.FormEvent) => {
+    e.preventDefault();
+    search(query);
   };
 
   const handleSelect = (result: any) => {
@@ -36,20 +44,19 @@ function TMDBSearch({ type, onSelect, onClose }: TMDBSearchProps) {
 
   return (
     <div className="tmdb-search">
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
+      <div className="search-bar" style={{ justifyContent: 'space-between', marginBottom: '15px' }}>
         <h3>Search The Movie Database (TMDB)</h3>
         <button type="button" className="btn btn-secondary" onClick={onClose}>
           Close
         </button>
       </div>
 
-      <form onSubmit={handleSearch} style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
+      <form onSubmit={handleSearch} className="search-bar">
         <input
           type="text"
           placeholder="Search for a movie or TV show..."
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          style={{ flex: 1 }}
         />
         <button type="submit" className="btn btn-primary" disabled={loading}>
           {loading ? 'Searching...' : 'Search'}
@@ -67,7 +74,7 @@ function TMDBSearch({ type, onSelect, onClose }: TMDBSearchProps) {
               {result.poster_path ? (
                 <img src={result.poster_path} alt={result.title || result.name} />
               ) : (
-                <div style={{ width: '100%', height: '250px', background: '#e0e0e0', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '4px' }}>
+                <div style={{ width: '100%', height: '250px', background: '#2e2e44', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '4px', color: '#5a5a70' }}>
                   No Image
                 </div>
               )}

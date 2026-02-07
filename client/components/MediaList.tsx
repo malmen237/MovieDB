@@ -34,10 +34,8 @@ function MediaList({ media, loading, onDelete, onEdit }: MediaListProps) {
               />
             )}
             <div className="media-info">
-              <h3 className="media-title">{item.originalTitle}</h3>
-              {item.swedishTitle && (
-                <p className="media-subtitle">{item.swedishTitle}</p>
-              )}
+              <h3 className="media-title">{item.swedishTitle || item.originalTitle}</h3>
+              <p className="media-subtitle">{item.originalTitle}</p>
               <div>
                 <span className="media-badge">
                   {item.type === 'movie' ? '📽️ Movie' : '📺 TV Series'}
@@ -54,9 +52,25 @@ function MediaList({ media, loading, onDelete, onEdit }: MediaListProps) {
             {item.director && <p><strong>Director:</strong> {item.director}</p>}
             {item.company && <p><strong>Company:</strong> {item.company}</p>}
             {item.partOf && <p><strong>Part of:</strong> {item.partOf}</p>}
+            {item.type === 'tv-series' && (item.seasons || item.totalSeasons) && (() => {
+              const owned = new Set(
+                (item.seasons || '').split(',').filter(Boolean).map(Number)
+              );
+              const total = item.totalSeasons || Math.max(...owned, 0);
+              const allSeasons = Array.from({ length: total }, (_, i) => i + 1);
+              return (
+                <div className="season-badges">
+                  {allSeasons.map(s => (
+                    <span key={s} className={`season-badge ${owned.has(s) ? 'owned' : 'missing'}`}>
+                      S{s}
+                    </span>
+                  ))}
+                </div>
+              );
+            })()}
             {item.extras && <p><strong>Extras:</strong> {item.extras}</p>}
             {item.overview && (
-              <p><strong>Overview:</strong> {item.overview}</p>
+              <p><strong>Overview:</strong> {item.overview.length > 200 ? item.overview.slice(0, 200) + '...' : item.overview}</p>
             )}
           </div>
 

@@ -1,5 +1,6 @@
 export interface MediaItem {
   id?: number;
+  userId: string;
   type: 'movie' | 'tv-series';
   originalTitle: string;
   swedishTitle?: string;
@@ -8,6 +9,8 @@ export interface MediaItem {
   format: 'bluray' | 'dvd' | 'other';
   productionYear: number;
   extras?: string;
+  seasons?: string;
+  totalSeasons?: number;
   partOf?: string; // e.g., "Lord of the Rings", "Marvel Cinematic Universe"
   tmdbId?: number;
   posterPath?: string;

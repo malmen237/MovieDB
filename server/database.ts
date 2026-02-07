@@ -4,11 +4,11 @@ import { MediaItem } from './types';
 
 const db = new Database(path.join(__dirname, '../moviedb.db'));
 
-// Initialize database schema
 export function initDatabase() {
   db.exec(`
     CREATE TABLE IF NOT EXISTS media (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
+      userId TEXT NOT NULL,
       type TEXT NOT NULL CHECK(type IN ('movie', 'tv-series')),
       originalTitle TEXT NOT NULL,
       swedishTitle TEXT,
@@ -24,7 +24,36 @@ export function initDatabase() {
       createdAt TEXT DEFAULT CURRENT_TIMESTAMP,
       updatedAt TEXT DEFAULT CURRENT_TIMESTAMP
     );
+  `);
 
+  const columns = db.prepare('PRAGMA table_info(media)').all() as { name: string }[];
+  const columnNames = columns.map(col => col.name);
+
+  if (!columnNames.includes('userId')) {
+    db.exec(`ALTER TABLE media ADD COLUMN userId TEXT NOT NULL DEFAULT 'default'`);
+  }
+  if (!columnNames.includes('seasons')) {
+    db.exec(`ALTER TABLE media ADD COLUMN seasons TEXT`);
+  }
+  if (!columnNames.includes('totalSeasons')) {
+    db.exec(`ALTER TABLE media ADD COLUMN totalSeasons INTEGER`);
+  }
+
+  const rowsToMigrate = db.prepare(
+    `SELECT id, extras FROM media WHERE type = 'tv-series' AND extras LIKE 'Seasons:%' AND seasons IS NULL`
+  ).all() as { id: number; extras: string }[];
+
+  const migrateStmt = db.prepare(`UPDATE media SET seasons = ?, extras = NULL WHERE id = ?`);
+  for (const row of rowsToMigrate) {
+    const match = row.extras.match(/^Seasons:\s*(.+)$/);
+    if (match) {
+      const seasonNumbers = match[1].split(',').map(s => s.trim()).join(',');
+      migrateStmt.run(seasonNumbers, row.id);
+    }
+  }
+
+  db.exec(`
+    CREATE INDEX IF NOT EXISTS idx_userId ON media(userId);
     CREATE INDEX IF NOT EXISTS idx_type ON media(type);
     CREATE INDEX IF NOT EXISTS idx_originalTitle ON media(originalTitle);
     CREATE INDEX IF NOT EXISTS idx_swedishTitle ON media(swedishTitle);
@@ -32,10 +61,9 @@ export function initDatabase() {
   `);
 }
 
-// Get all media items
-export function getAllMedia(type?: string, search?: string): MediaItem[] {
-  let query = 'SELECT * FROM media WHERE 1=1';
-  const params: any[] = [];
+export function getAllMedia(userId: string, type?: string, search?: string): MediaItem[] {
+  let query = 'SELECT * FROM media WHERE userId = ?';
+  const params: any[] = [userId];
 
   if (type && (type === 'movie' || type === 'tv-series')) {
     query += ' AND type = ?';
@@ -54,22 +82,21 @@ export function getAllMedia(type?: string, search?: string): MediaItem[] {
   return stmt.all(...params) as MediaItem[];
 }
 
-// Get media item by ID
-export function getMediaById(id: number): MediaItem | undefined {
-  const stmt = db.prepare('SELECT * FROM media WHERE id = ?');
-  return stmt.get(id) as MediaItem | undefined;
+export function getMediaById(userId: string, id: number): MediaItem | undefined {
+  const stmt = db.prepare('SELECT * FROM media WHERE id = ? AND userId = ?');
+  return stmt.get(id, userId) as MediaItem | undefined;
 }
 
-// Add new media item
 export function addMedia(item: MediaItem): number {
   const stmt = db.prepare(`
     INSERT INTO media (
-      type, originalTitle, swedishTitle, company, director,
-      format, productionYear, extras, partOf, tmdbId, posterPath, overview
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      userId, type, originalTitle, swedishTitle, company, director,
+      format, productionYear, extras, seasons, totalSeasons, partOf, tmdbId, posterPath, overview
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
 
   const result = stmt.run(
+    item.userId,
     item.type,
     item.originalTitle,
     item.swedishTitle || null,
@@ -78,6 +105,8 @@ export function addMedia(item: MediaItem): number {
     item.format,
     item.productionYear,
     item.extras || null,
+    item.seasons || null,
+    item.totalSeasons || null,
     item.partOf || null,
     item.tmdbId || null,
     item.posterPath || null,
@@ -87,14 +116,13 @@ export function addMedia(item: MediaItem): number {
   return result.lastInsertRowid as number;
 }
 
-// Update media item
-export function updateMedia(id: number, item: Partial<MediaItem>): boolean {
+export function updateMedia(userId: string, id: number, item: Partial<MediaItem>): boolean {
   const fields: string[] = [];
   const values: any[] = [];
 
   const allowedFields = [
     'type', 'originalTitle', 'swedishTitle', 'company', 'director',
-    'format', 'productionYear', 'extras', 'partOf', 'tmdbId', 'posterPath', 'overview'
+    'format', 'productionYear', 'extras', 'seasons', 'totalSeasons', 'partOf', 'tmdbId', 'posterPath', 'overview'
   ];
 
   for (const [key, value] of Object.entries(item)) {
@@ -109,32 +137,47 @@ export function updateMedia(id: number, item: Partial<MediaItem>): boolean {
   }
 
   fields.push('updatedAt = CURRENT_TIMESTAMP');
-  values.push(id);
+  values.push(id, userId);
 
-  const stmt = db.prepare(`UPDATE media SET ${fields.join(', ')} WHERE id = ?`);
+  const stmt = db.prepare(`UPDATE media SET ${fields.join(', ')} WHERE id = ? AND userId = ?`);
   const result = stmt.run(...values);
 
   return result.changes > 0;
 }
 
-// Delete media item
-export function deleteMedia(id: number): boolean {
-  const stmt = db.prepare('DELETE FROM media WHERE id = ?');
-  const result = stmt.run(id);
+export function deleteMedia(userId: string, id: number): boolean {
+  const stmt = db.prepare('DELETE FROM media WHERE id = ? AND userId = ?');
+  const result = stmt.run(id, userId);
   return result.changes > 0;
 }
 
-// Get statistics
-export function getStats() {
-  const movieCount = db.prepare('SELECT COUNT(*) as count FROM media WHERE type = ?').get('movie') as { count: number };
-  const tvCount = db.prepare('SELECT COUNT(*) as count FROM media WHERE type = ?').get('tv-series') as { count: number };
-  const totalCount = db.prepare('SELECT COUNT(*) as count FROM media').get() as { count: number };
+export function getStats(userId: string) {
+  const movieCount = db.prepare('SELECT COUNT(*) as count FROM media WHERE userId = ? AND type = ?').get(userId, 'movie') as { count: number };
+  const tvCount = db.prepare('SELECT COUNT(*) as count FROM media WHERE userId = ? AND type = ?').get(userId, 'tv-series') as { count: number };
+  const totalCount = db.prepare('SELECT COUNT(*) as count FROM media WHERE userId = ?').get(userId) as { count: number };
 
   return {
     movies: movieCount.count,
     tvSeries: tvCount.count,
     total: totalCount.count
   };
+}
+
+export function getUnenrichedMedia(userId: string): MediaItem[] {
+  const stmt = db.prepare('SELECT * FROM media WHERE userId = ? AND tmdbId IS NULL');
+  return stmt.all(userId) as MediaItem[];
+}
+
+export function getUsersWithUnenrichedMedia(): string[] {
+  const stmt = db.prepare('SELECT DISTINCT userId FROM media WHERE tmdbId IS NULL');
+  return (stmt.all() as { userId: string }[]).map(r => r.userId);
+}
+
+export function getTVSeriesMissingTotalSeasons(): MediaItem[] {
+  const stmt = db.prepare(
+    `SELECT * FROM media WHERE type = 'tv-series' AND tmdbId IS NOT NULL AND totalSeasons IS NULL`
+  );
+  return stmt.all() as MediaItem[];
 }
 
 export default db;

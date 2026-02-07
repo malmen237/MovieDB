@@ -1,10 +1,10 @@
-import { useState, useEffect } from 'react';
-import { api, MediaItem, Stats } from './api';
+import { useState, useEffect, useRef } from 'react';
+import { api, MediaItem, Stats, getCurrentUser, setCurrentUser } from './api';
 import MediaList from './components/MediaList';
 import MediaForm from './components/MediaForm';
 import ImportCSV from './components/ImportCSV';
 
-type View = 'all' | 'movies' | 'tv-series' | 'add' | 'import';
+type View = 'all' | 'movies' | 'tv-series' | 'add' | 'csv';
 
 function App() {
   const [view, setView] = useState<View>('all');
@@ -14,6 +14,11 @@ function App() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [editingItem, setEditingItem] = useState<MediaItem | null>(null);
+  const [user, setUser] = useState(getCurrentUser());
+  const [enrichStatus, setEnrichStatus] = useState<{ type: string; processed: number; total: number } | null>(null);
+  const [addMenuOpen, setAddMenuOpen] = useState(false);
+  const userInputRef = useRef<HTMLInputElement>(null);
+  const addMenuRef = useRef<HTMLDivElement>(null);
 
   const loadMedia = async () => {
     try {
@@ -42,7 +47,30 @@ function App() {
   useEffect(() => {
     loadMedia();
     loadStats();
-  }, [view, search]);
+  }, [view, search, user]);
+
+  useEffect(() => {
+    const eventSource = new EventSource('/api/enrich/stream');
+    eventSource.onmessage = (e) => {
+      const event = JSON.parse(e.data);
+      setEnrichStatus(event);
+      if (event.type === 'done') {
+        loadMedia();
+        loadStats();
+      }
+    };
+    return () => eventSource.close();
+  }, []);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (addMenuRef.current && !addMenuRef.current.contains(e.target as Node)) {
+        setAddMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const handleDelete = async (id: number) => {
     if (!confirm('Are you sure you want to delete this item?')) return;
@@ -74,6 +102,14 @@ function App() {
     setView('all');
   };
 
+  const applyUser = () => {
+    const value = userInputRef.current?.value.trim();
+    if (value && value !== user) {
+      setCurrentUser(value);
+      setUser(value);
+    }
+  };
+
   const handleImportComplete = async () => {
     await loadMedia();
     await loadStats();
@@ -83,21 +119,33 @@ function App() {
   return (
     <div>
       <div className="header">
-        <div className="container">
-          <h1>Movie Database</h1>
+        <div className="header-left">
+          <span className="header-logo">Movie Database</span>
           <div className="stats">
             <div className="stat-item">
-              <span>📽️ Movies:</span>
+              <span>Movies:</span>
               <strong>{stats.movies}</strong>
             </div>
             <div className="stat-item">
-              <span>📺 TV Series:</span>
+              <span>TV Series:</span>
               <strong>{stats.tvSeries}</strong>
             </div>
             <div className="stat-item">
-              <span>📚 Total:</span>
+              <span>Total:</span>
               <strong>{stats.total}</strong>
             </div>
+          </div>
+        </div>
+        <div className="header-right">
+          <div className="user-switcher">
+            <input
+              id="user-input"
+              ref={userInputRef}
+              type="text"
+              defaultValue={user}
+              onBlur={applyUser}
+              onKeyDown={(e) => e.key === 'Enter' && applyUser()}
+            />
           </div>
         </div>
       </div>
@@ -122,22 +170,31 @@ function App() {
           >
             TV Series
           </button>
-          <button
-            className={view === 'add' ? 'active' : ''}
-            onClick={() => {
-              setEditingItem(null);
-              setView('add');
-            }}
-          >
-            Add New
-          </button>
-          <button
-            className={view === 'import' ? 'active' : ''}
-            onClick={() => setView('import')}
-          >
-            Import CSV
-          </button>
+          <div className="add-menu-wrapper" ref={addMenuRef}>
+            <button
+              className={`add-menu-trigger ${addMenuOpen ? 'open' : ''}`}
+              onClick={() => setAddMenuOpen(!addMenuOpen)}
+            >
+              +
+            </button>
+            {addMenuOpen && (
+              <div className="add-menu-dropdown">
+                <button onClick={() => { setEditingItem(null); setView('add'); setAddMenuOpen(false); }}>
+                  Add New
+                </button>
+                <button onClick={() => { setView('csv'); setAddMenuOpen(false); }}>
+                  Import / Export CSV
+                </button>
+              </div>
+            )}
+          </div>
         </div>
+
+        {enrichStatus?.type === 'progress' && (
+          <div className="message message-info">
+            Fetching TMDB info... {enrichStatus.processed}/{enrichStatus.total}
+          </div>
+        )}
 
         {error && (
           <div className="message message-error">
@@ -153,11 +210,11 @@ function App() {
           />
         )}
 
-        {view === 'import' && (
+        {view === 'csv' && (
           <ImportCSV onComplete={handleImportComplete} />
         )}
 
-        {view !== 'add' && view !== 'import' && (
+        {view !== 'add' && view !== 'csv' && (
           <>
             <div className="search-bar">
               <input

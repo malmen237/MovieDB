@@ -18,6 +18,8 @@ function MediaForm({ item, onSave, onCancel }: MediaFormProps) {
     company: '',
     director: '',
     extras: '',
+    seasons: '',
+    totalSeasons: undefined,
     partOf: '',
     overview: ''
   });
@@ -28,7 +30,17 @@ function MediaForm({ item, onSave, onCancel }: MediaFormProps) {
 
   useEffect(() => {
     if (item) {
-      setFormData(item);
+      setFormData({
+        ...item,
+        swedishTitle: item.swedishTitle || '',
+        company: item.company || '',
+        director: item.director || '',
+        extras: item.extras || '',
+        seasons: item.seasons || '',
+        totalSeasons: item.totalSeasons || undefined,
+        partOf: item.partOf || '',
+        overview: item.overview || '',
+      });
     }
   }, [item]);
 
@@ -37,7 +49,7 @@ function MediaForm({ item, onSave, onCancel }: MediaFormProps) {
     setError(null);
     setSuccess(null);
 
-    if (!formData.originalTitle || !formData.productionYear) {
+    if (!formData.originalTitle) {
       setError('Please fill in all required fields');
       return;
     }
@@ -82,7 +94,7 @@ function MediaForm({ item, onSave, onCancel }: MediaFormProps) {
       {success && <div className="message message-success">{success}</div>}
 
       {!showTMDBSearch && (
-        <div style={{ marginBottom: '20px' }}>
+        <div className="form-group">
           <button
             type="button"
             className="btn btn-secondary"
@@ -96,6 +108,7 @@ function MediaForm({ item, onSave, onCancel }: MediaFormProps) {
       {showTMDBSearch && (
         <TMDBSearch
           type={formData.type}
+          initialQuery={formData.originalTitle}
           onSelect={handleTMDBSelect}
           onClose={() => setShowTMDBSearch(false)}
         />
@@ -131,14 +144,14 @@ function MediaForm({ item, onSave, onCancel }: MediaFormProps) {
           </div>
 
           <div className="form-group">
-            <label>Production Year *</label>
+            <label>Production Year</label>
             <input
               type="number"
-              value={formData.productionYear}
+              value={formData.productionYear || ''}
               onChange={(e) =>
-                setFormData({ ...formData, productionYear: parseInt(e.target.value) })
+                setFormData({ ...formData, productionYear: parseInt(e.target.value) || 0 })
               }
-              min="1800"
+              min="0"
               max={new Date().getFullYear() + 5}
             />
           </div>
@@ -201,6 +214,32 @@ function MediaForm({ item, onSave, onCancel }: MediaFormProps) {
             }
           />
         </div>
+
+        {formData.type === 'tv-series' && (
+          <div className="form-row">
+            <div className="form-group">
+              <label>Owned Seasons (comma-separated, e.g. 1,2,3)</label>
+              <input
+                type="text"
+                value={formData.seasons || ''}
+                onChange={(e) =>
+                  setFormData({ ...formData, seasons: e.target.value })
+                }
+              />
+            </div>
+            <div className="form-group">
+              <label>Total Seasons</label>
+              <input
+                type="number"
+                value={formData.totalSeasons || ''}
+                onChange={(e) =>
+                  setFormData({ ...formData, totalSeasons: parseInt(e.target.value) || undefined })
+                }
+                min="1"
+              />
+            </div>
+          </div>
+        )}
 
         <div className="form-group">
           <label>Extras/Special Features</label>
