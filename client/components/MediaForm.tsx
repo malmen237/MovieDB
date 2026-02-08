@@ -1,14 +1,17 @@
 import { useState, useEffect } from 'react';
 import { api, MediaItem, TMDBSearchResult } from '../api';
+import { FORMATS } from '../../shared/formats';
 import TMDBSearch from './TMDBSearch';
 
 interface MediaFormProps {
   item: MediaItem | null;
   onSave: () => void;
   onCancel: () => void;
+  onDelete?: (id: number) => void;
+  onDismissTmdb?: (id: number) => void;
 }
 
-function MediaForm({ item, onSave, onCancel }: MediaFormProps) {
+function MediaForm({ item, onSave, onCancel, onDelete, onDismissTmdb }: MediaFormProps) {
   const [formData, setFormData] = useState<Partial<MediaItem>>({
     type: 'movie',
     format: 'bluray',
@@ -89,7 +92,10 @@ function MediaForm({ item, onSave, onCancel }: MediaFormProps) {
 
   return (
     <div className="form">
-      <h2>{item ? 'Edit Item' : 'Add New Item'}</h2>
+      <div className="form-header">
+        <h2>{item ? (formData.swedishTitle || formData.originalTitle) : 'Add New Item'}</h2>
+        <button type="button" className="form-close" onClick={onCancel}>&times;</button>
+      </div>
 
       {error && <div className="message message-error">{error}</div>}
       {success && <div className="message message-success">{success}</div>}
@@ -133,26 +139,21 @@ function MediaForm({ item, onSave, onCancel }: MediaFormProps) {
           <div className="form-group">
             <label>Format *</label>
             <div className="format-toggles">
-              {[
-                { value: 'bluray', label: 'Blu-ray' },
-                { value: 'dvd', label: 'DVD' },
-                { value: 'vhs', label: 'VHS' },
-                { value: 'other', label: 'Other' }
-              ].map(opt => {
-                const selected = (formData.format || '').split(',');
+              {FORMATS.map(opt => {
+                const selected = (formData.format || '').split(',').filter(Boolean);
                 const isActive = selected.includes(opt.value);
+                const isLastActive = isActive && selected.length === 1;
                 return (
                   <button
                     key={opt.value}
                     type="button"
                     className={`format-toggle ${isActive ? 'active' : ''}`}
+                    disabled={isLastActive}
                     onClick={() => {
                       const next = isActive
                         ? selected.filter(v => v !== opt.value)
                         : [...selected, opt.value];
-                      if (next.length > 0) {
-                        setFormData({ ...formData, format: next.filter(Boolean).join(',') });
-                      }
+                      setFormData({ ...formData, format: next.join(',') });
                     }}
                   >
                     {opt.label}
@@ -284,9 +285,32 @@ function MediaForm({ item, onSave, onCancel }: MediaFormProps) {
           <button type="submit" className="btn btn-primary">
             {item ? 'Update' : 'Add'} Item
           </button>
-          <button type="button" className="btn btn-secondary" onClick={onCancel}>
-            Cancel
-          </button>
+          {item?.id && item.tmdbId && item.tmdbId > 0 && onDismissTmdb && (
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={() => {
+                if (confirm('Dismiss TMDB data? This will clear the poster, overview, and TMDB link.')) {
+                  onDismissTmdb(item.id!);
+                }
+              }}
+            >
+              Dismiss TMDB
+            </button>
+          )}
+          {item?.id && onDelete && (
+            <button
+              type="button"
+              className="btn btn-danger"
+              onClick={() => {
+                if (confirm('Are you sure you want to delete this item?')) {
+                  onDelete(item.id!);
+                }
+              }}
+            >
+              Delete
+            </button>
+          )}
         </div>
       </form>
     </div>

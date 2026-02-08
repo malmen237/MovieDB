@@ -16,6 +16,7 @@ import { searchTMDB, getTMDBDetails } from './tmdb';
 import { importCSV, previewCSV, commitImport } from './csvImport';
 import { exportMoviesCSV, exportTVSeriesCSV } from './csvExport';
 import { MediaItem, ImportCommitItem } from '../shared/types';
+import { validateFormat } from '../shared/formats';
 import { nudgeQueue, startQueue, subscribe } from './enrichQueue';
 
 declare global {
@@ -138,6 +139,11 @@ app.post('/api/media', (req: Request, res: Response) => {
       return;
     }
 
+    if (!validateFormat(item.format)) {
+      res.status(400).json({ error: 'Invalid format value' });
+      return;
+    }
+
     const id = addMedia(item);
     const newItem = getMediaById(req.userId, id);
     nudgeQueue(req.userId);
@@ -151,6 +157,11 @@ app.put('/api/media/:id', (req: Request, res: Response) => {
   try {
     const id = parseInt(req.params.id);
     const item: Partial<MediaItem> = req.body;
+
+    if (item.format !== undefined && !validateFormat(item.format)) {
+      res.status(400).json({ error: 'Invalid format value' });
+      return;
+    }
 
     const success = updateMedia(req.userId, id, item);
     if (success) {

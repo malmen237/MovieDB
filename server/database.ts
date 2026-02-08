@@ -1,6 +1,7 @@
 import Database from 'better-sqlite3';
 import path from 'path';
 import { MediaItem } from '../shared/types';
+import { validateFormat } from '../shared/formats';
 
 type SqlParam = string | number | null;
 
@@ -62,7 +63,8 @@ export function initDatabase() {
 
   const tableInfo = db.prepare(`SELECT sql FROM sqlite_master WHERE type='table' AND name='media'`).get() as { sql: string } | undefined;
   if (tableInfo && tableInfo.sql.includes("CHECK(format IN")) {
-    db.exec(`
+    console.log('Migrating media table: removing format CHECK constraint...');
+    db.exec(`BEGIN TRANSACTION;
       CREATE TABLE media_new (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         userId TEXT NOT NULL,
@@ -86,16 +88,22 @@ export function initDatabase() {
       INSERT INTO media_new SELECT id, userId, type, originalTitle, swedishTitle, company, director, format, productionYear, extras, seasons, totalSeasons, partOf, tmdbId, posterPath, overview, createdAt, updatedAt FROM media;
       DROP TABLE media;
       ALTER TABLE media_new RENAME TO media;
+      CREATE INDEX idx_userId ON media(userId);
+      CREATE INDEX idx_type ON media(type);
+      CREATE INDEX idx_originalTitle ON media(originalTitle);
+      CREATE INDEX idx_swedishTitle ON media(swedishTitle);
+      CREATE INDEX idx_partOf ON media(partOf);
+    COMMIT;`);
+    console.log('Migration complete.');
+  } else {
+    db.exec(`
+      CREATE INDEX IF NOT EXISTS idx_userId ON media(userId);
+      CREATE INDEX IF NOT EXISTS idx_type ON media(type);
+      CREATE INDEX IF NOT EXISTS idx_originalTitle ON media(originalTitle);
+      CREATE INDEX IF NOT EXISTS idx_swedishTitle ON media(swedishTitle);
+      CREATE INDEX IF NOT EXISTS idx_partOf ON media(partOf);
     `);
   }
-
-  db.exec(`
-    CREATE INDEX IF NOT EXISTS idx_userId ON media(userId);
-    CREATE INDEX IF NOT EXISTS idx_type ON media(type);
-    CREATE INDEX IF NOT EXISTS idx_originalTitle ON media(originalTitle);
-    CREATE INDEX IF NOT EXISTS idx_swedishTitle ON media(swedishTitle);
-    CREATE INDEX IF NOT EXISTS idx_partOf ON media(partOf);
-  `);
 }
 
 export function getAllMedia(userId: string, type?: string, search?: string): MediaItem[] {
@@ -125,6 +133,10 @@ export function getMediaById(userId: string, id: number): MediaItem | undefined 
 }
 
 export function addMedia(item: MediaItem): number {
+  if (!validateFormat(item.format)) {
+    throw new Error(`Invalid format: "${item.format}"`);
+  }
+
   const stmt = db.prepare(`
     INSERT INTO media (
       userId, type, originalTitle, swedishTitle, company, director,
@@ -154,6 +166,10 @@ export function addMedia(item: MediaItem): number {
 }
 
 export function updateMedia(userId: string, id: number, item: Partial<MediaItem>): boolean {
+  if (item.format !== undefined && !validateFormat(item.format)) {
+    throw new Error(`Invalid format: "${item.format}"`);
+  }
+
   const setClauses: string[] = [];
   const values: SqlParam[] = [];
 

@@ -3,9 +3,7 @@ import { MediaItem } from '../api';
 interface MediaListProps {
   media: MediaItem[];
   loading: boolean;
-  onDelete: (id: number) => void;
-  onEdit: (item: MediaItem) => void;
-  onDismissTmdb: (id: number) => void;
+  onSelect: (item: MediaItem) => void;
 }
 
 function SeasonBadges({ seasons, totalSeasons }: { seasons?: string; totalSeasons?: number }) {
@@ -28,7 +26,7 @@ function SeasonBadges({ seasons, totalSeasons }: { seasons?: string; totalSeason
   );
 }
 
-function MediaList({ media, loading, onDelete, onEdit, onDismissTmdb }: MediaListProps) {
+function MediaList({ media, loading, onSelect }: MediaListProps) {
   if (loading) {
     return <div className="loading">Loading...</div>;
   }
@@ -45,7 +43,7 @@ function MediaList({ media, loading, onDelete, onEdit, onDismissTmdb }: MediaLis
   return (
     <div className="media-grid">
       {media.map((item) => (
-        <div key={item.id} id={`media-${item.id}`} className="media-card">
+        <div key={item.id} id={`media-${item.id}`} className="media-card" onClick={() => onSelect(item)}>
           <div className="media-card-header">
             {item.posterPath && (
               <img
@@ -64,6 +62,22 @@ function MediaList({ media, loading, onDelete, onEdit, onDismissTmdb }: MediaLis
                 {item.format.split(',').map(f => (
                   <span key={f} className="media-badge">{f.toUpperCase()}</span>
                 ))}
+                {item.tmdbId && item.tmdbId > 0 && (
+                  <a
+                    className="btn btn-secondary btn-icon"
+                    href={`https://www.themoviedb.org/${item.type === 'movie' ? 'movie' : 'tv'}/${item.tmdbId}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    title="View on TMDB"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M12 8.667V12.667A1.333 1.333 0 0 1 10.667 14H3.333A1.333 1.333 0 0 1 2 12.667V5.333A1.333 1.333 0 0 1 3.333 4H7.333" />
+                      <path d="M10 2H14V6" />
+                      <path d="M6.667 9.333L14 2" />
+                    </svg>
+                  </a>
+                )}
               </div>
             </div>
           </div>
@@ -80,29 +94,6 @@ function MediaList({ media, loading, onDelete, onEdit, onDismissTmdb }: MediaLis
             {item.overview && (
               <p><strong>Overview:</strong> {item.overview.length > 200 ? item.overview.slice(0, 200) + '...' : item.overview}</p>
             )}
-          </div>
-
-          <div className="media-actions">
-            <button
-              className="btn btn-secondary"
-              onClick={() => onEdit(item)}
-            >
-              Edit
-            </button>
-            {item.tmdbId && item.tmdbId > 0 && (
-              <button
-                className="btn btn-secondary"
-                onClick={() => onDismissTmdb(item.id!)}
-              >
-                Dismiss
-              </button>
-            )}
-            <button
-              className="btn btn-danger"
-              onClick={() => onDelete(item.id!)}
-            >
-              Delete
-            </button>
           </div>
         </div>
       ))}

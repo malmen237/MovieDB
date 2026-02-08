@@ -33,14 +33,18 @@ function parseMovieRow(cols: string[], userId: string): MediaItem | null {
 
   const isBoth = notesCol === 'BR/DVD' || notesCol.startsWith('BR/DVD ') || notesCol.startsWith('BR/DVD,');
   const isBluray = !isBoth && (notesCol === 'BR' || notesCol.startsWith('BR ') || notesCol.startsWith('BR,'));
+  const isVHS = !isBoth && !isBluray && (notesCol === 'VHS' || notesCol.startsWith('VHS ') || notesCol.startsWith('VHS,'));
 
   const extras = (isBoth || isBluray)
     ? notesCol.replace(/^BR(?:\/DVD)?[, ]*/, '').trim()
-    : notesCol;
+    : isVHS
+      ? notesCol.replace(/^VHS[, ]*/, '').trim()
+      : notesCol;
 
   let format = 'dvd';
   if (isBoth) format = 'bluray,dvd';
   else if (isBluray) format = 'bluray';
+  else if (isVHS) format = 'vhs';
 
   return {
     userId,

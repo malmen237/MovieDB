@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { api, MediaItem, getCurrentUser, setCurrentUser } from './api';
 import { TMDB_REJECTED_ID } from '../shared/types';
+import { FORMATS } from '../shared/formats';
 import { useDebounce } from './hooks/useDebounce';
 import { useMediaData } from './hooks/useMediaData';
 import { useEnrichmentStream } from './hooks/useEnrichmentStream';
@@ -61,10 +62,10 @@ function App() {
   }, []);
 
   const handleDelete = async (id: number) => {
-    if (!confirm('Are you sure you want to delete this item?')) return;
-
     try {
       await api.deleteMedia(id);
+      setEditingItem(null);
+      setView(previousView);
       await refresh();
     } catch (err) {
       setError('Failed to delete item');
@@ -75,7 +76,10 @@ function App() {
   const handleDismissTmdb = async (id: number) => {
     try {
       await api.updateMedia(id, { tmdbId: TMDB_REJECTED_ID, posterPath: '', overview: '' });
-      await refresh();
+      if (editingItem?.id === id) {
+        setEditingItem({ ...editingItem, tmdbId: TMDB_REJECTED_ID, posterPath: '', overview: '' });
+      }
+      refresh();
     } catch (err) {
       setError('Failed to dismiss TMDB match');
       console.error(err);
@@ -207,6 +211,8 @@ function App() {
             item={editingItem}
             onSave={handleSave}
             onCancel={handleCancel}
+            onDelete={handleDelete}
+            onDismissTmdb={handleDismissTmdb}
           />
         )}
 
@@ -217,49 +223,57 @@ function App() {
         {view !== 'add' && view !== 'csv' && (
           <>
             <div className="search-bar">
-              <input
-                type="text"
-                placeholder="Search by title or collection..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-              />
+              <div className="search-input-wrapper">
+                <input
+                  type="text"
+                  placeholder="Search by title or collection..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                />
+                {search && (
+                  <button
+                    className="search-clear"
+                    onClick={() => setSearch('')}
+                    type="button"
+                  >
+                    &times;
+                  </button>
+                )}
+              </div>
             </div>
 
             <div className="format-filter-bar">
-              {['bluray', 'dvd', 'vhs', 'other'].map(f => (
+              {FORMATS.map(({ value, label }) => (
                 <button
-                  key={f}
-                  className={`format-filter-btn ${formatFilter.has(f) ? 'active' : ''}`}
+                  key={value}
+                  className={`format-filter-btn ${formatFilter.has(value) ? 'active' : ''}`}
                   onClick={() => {
                     setFormatFilter(prev => {
                       const next = new Set(prev);
-                      if (next.has(f)) next.delete(f);
-                      else next.add(f);
+                      if (next.has(value)) next.delete(value);
+                      else next.add(value);
                       return next;
                     });
                   }}
                 >
-                  {f.toUpperCase()}
+                  {label}
                 </button>
               ))}
-              {formatFilter.size >= 2 && (
-                <label className="format-match-all">
-                  <input
-                    type="checkbox"
-                    checked={formatMatchAll}
-                    onChange={(e) => setFormatMatchAll(e.target.checked)}
-                  />
-                  Match all
-                </label>
-              )}
+              <label className={`format-match-all ${formatFilter.size < 2 ? 'disabled' : ''}`}>
+                <input
+                  type="checkbox"
+                  checked={formatMatchAll}
+                  disabled={formatFilter.size < 2}
+                  onChange={(e) => setFormatMatchAll(e.target.checked)}
+                />
+                Match all
+              </label>
             </div>
 
             <MediaList
               media={filteredMedia}
               loading={loading}
-              onDelete={handleDelete}
-              onEdit={handleEdit}
-              onDismissTmdb={handleDismissTmdb}
+              onSelect={handleEdit}
             />
           </>
         )}

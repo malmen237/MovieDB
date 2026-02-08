@@ -218,10 +218,15 @@ body {
   flex-wrap: wrap;
 }
 
-.search-bar input {
+.search-input-wrapper {
   flex: 1;
   min-width: 250px;
-  padding: 10px 14px;
+  position: relative;
+}
+
+.search-input-wrapper input {
+  width: 100%;
+  padding: 10px 34px 10px 14px;
   border: 1px solid var(--color-border);
   border-radius: 6px;
   font-size: 0.95rem;
@@ -229,13 +234,33 @@ body {
   color: var(--color-text-primary);
 }
 
-.search-bar input::placeholder {
+.search-input-wrapper input::placeholder {
   color: var(--color-text-faint);
 }
 
-.search-bar input:focus {
+.search-input-wrapper input:focus {
   outline: none;
   border-color: var(--color-accent);
+}
+
+.search-clear {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: var(--color-text-faint);
+  font-size: 1.2rem;
+  cursor: pointer;
+  padding: 2px 6px;
+  line-height: 1;
+  border-radius: 4px;
+  transition: color 0.2s;
+}
+
+.search-clear:hover {
+  color: var(--color-text-primary);
 }
 
 .search-bar select {
@@ -297,9 +322,18 @@ body {
   user-select: none;
 }
 
+.format-match-all.disabled {
+  color: var(--color-text-faint);
+  cursor: default;
+}
+
 .format-match-all input[type="checkbox"] {
   accent-color: var(--color-accent);
   cursor: pointer;
+}
+
+.format-match-all.disabled input[type="checkbox"] {
+  cursor: default;
 }
 
 /* Cards */
@@ -316,6 +350,7 @@ body {
   padding: 18px;
   border: 1px solid var(--color-bg-tertiary);
   transition: border-color 0.2s;
+  cursor: pointer;
 }
 
 .media-card:hover {
@@ -405,21 +440,16 @@ body {
   color: var(--color-text-faint);
 }
 
-.media-actions {
-  display: flex;
-  gap: 8px;
-  margin-top: 14px;
-  padding-top: 14px;
-  border-top: 1px solid var(--color-bg-tertiary);
-}
-
 .btn {
+  display: inline-block;
   padding: 7px 14px;
   border: none;
   border-radius: 5px;
   cursor: pointer;
   font-size: 0.85rem;
   font-weight: 500;
+  text-decoration: none;
+  text-align: center;
   transition: all 0.2s;
 }
 
@@ -459,6 +489,13 @@ body {
   color: var(--color-text-primary);
 }
 
+.btn-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 7px 8px;
+}
+
 /* Form */
 .form {
   background: var(--color-bg-secondary);
@@ -468,10 +505,32 @@ body {
   margin-bottom: 30px;
 }
 
-.form h2 {
+.form-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   margin-bottom: 20px;
+}
+
+.form h2 {
   color: var(--color-text-heading);
   font-size: 1.2rem;
+}
+
+.form-close {
+  background: none;
+  border: none;
+  color: var(--color-text-faint);
+  font-size: 1.5rem;
+  cursor: pointer;
+  padding: 4px 8px;
+  line-height: 1;
+  border-radius: 4px;
+  transition: color 0.2s;
+}
+
+.form-close:hover {
+  color: var(--color-text-primary);
 }
 
 .form-group {

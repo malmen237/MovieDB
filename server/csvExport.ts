@@ -4,8 +4,11 @@ export function exportMoviesCSV(items: MediaItem[]): string {
   const rows = items.map(item => {
     const noteParts: string[] = [];
     const formats = item.format.split(',');
-    if (formats.includes('bluray') && formats.includes('dvd')) noteParts.push('BR/DVD');
-    else if (formats.includes('bluray')) noteParts.push('BR');
+    const hasBluray = formats.includes('bluray');
+    const hasDvd = formats.includes('dvd');
+    if (hasBluray && hasDvd) noteParts.push('BR/DVD');
+    else if (hasBluray) noteParts.push('BR');
+    if (formats.includes('vhs')) noteParts.push('VHS');
     if (item.extras) noteParts.push(item.extras);
     const notes = noteParts.join(' ');
     const year = item.productionYear ? String(item.productionYear) : '';
