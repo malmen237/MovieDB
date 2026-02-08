@@ -3,7 +3,9 @@ import { MediaItem } from '../shared/types';
 export function exportMoviesCSV(items: MediaItem[]): string {
   const rows = items.map(item => {
     const noteParts: string[] = [];
-    if (item.format === 'bluray') noteParts.push('BR');
+    const formats = item.format.split(',');
+    if (formats.includes('bluray') && formats.includes('dvd')) noteParts.push('BR/DVD');
+    else if (formats.includes('bluray')) noteParts.push('BR');
     if (item.extras) noteParts.push(item.extras);
     const notes = noteParts.join(' ');
     const year = item.productionYear ? String(item.productionYear) : '';

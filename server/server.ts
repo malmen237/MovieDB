@@ -13,9 +13,9 @@ import {
   getStats
 } from './database';
 import { searchTMDB, getTMDBDetails } from './tmdb';
-import { importCSV } from './csvImport';
+import { importCSV, previewCSV, commitImport } from './csvImport';
 import { exportMoviesCSV, exportTVSeriesCSV } from './csvExport';
-import { MediaItem } from '../shared/types';
+import { MediaItem, ImportCommitItem } from '../shared/types';
 import { nudgeQueue, startQueue, subscribe } from './enrichQueue';
 
 declare global {
@@ -228,6 +228,38 @@ app.post('/api/import/csv', upload.single('file'), async (req: Request, res: Res
     });
   } catch (error) {
     res.status(500).json({ error: 'Failed to import CSV' });
+  }
+});
+
+app.post('/api/import/csv/preview', upload.single('file'), async (req: Request, res: Response) => {
+  try {
+    if (!req.file) {
+      res.status(400).json({ error: 'No file uploaded' });
+      return;
+    }
+
+    const fileContent = req.file.buffer.toString('utf-8');
+    const csvFormat = (req.body.csvFormat as string) || 'movies';
+    const result = await previewCSV(fileContent, req.userId, csvFormat);
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to preview CSV' });
+  }
+});
+
+app.post('/api/import/csv/commit', async (req: Request, res: Response) => {
+  try {
+    const items = req.body.items as ImportCommitItem[];
+    if (!items || !Array.isArray(items)) {
+      res.status(400).json({ error: 'items array is required' });
+      return;
+    }
+
+    const result = await commitImport(req.userId, items);
+    nudgeQueue(req.userId);
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to commit import' });
   }
 });
 

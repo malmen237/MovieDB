@@ -61,9 +61,9 @@ function MediaList({ media, loading, onDelete, onEdit, onDismissTmdb }: MediaLis
                 <span className="media-badge">
                   {item.type === 'movie' ? '📽️ Movie' : '📺 TV Series'}
                 </span>
-                <span className="media-badge">
-                  {item.format.toUpperCase()}
-                </span>
+                {item.format.split(',').map(f => (
+                  <span key={f} className="media-badge">{f.toUpperCase()}</span>
+                ))}
               </div>
             </div>
           </div>

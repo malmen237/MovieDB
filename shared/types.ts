@@ -8,7 +8,7 @@ export interface MediaItem {
   swedishTitle?: string;
   company?: string;
   director?: string;
-  format: 'bluray' | 'dvd' | 'other';
+  format: string;
   productionYear: number;
   extras?: string;
   seasons?: string;
@@ -66,5 +66,40 @@ export interface EnrichEvent {
 export interface ImportResult {
   message: string;
   success: number;
+  errors: string[];
+}
+
+export interface ConflictFieldDiff {
+  field: string;
+  existing: string | number | undefined;
+  incoming: string | number | undefined;
+}
+
+export interface ImportPreviewRow {
+  csvIndex: number;
+  classification: 'new' | 'duplicate' | 'conflict';
+  incoming: MediaItem;
+  existingId?: number;
+  diffs?: ConflictFieldDiff[];
+}
+
+export interface ImportPreviewResult {
+  newItems: ImportPreviewRow[];
+  duplicates: ImportPreviewRow[];
+  conflicts: ImportPreviewRow[];
+  warnings?: string[];
+}
+
+export interface ImportCommitItem {
+  csvIndex: number;
+  action: 'add' | 'update' | 'skip';
+  existingId?: number;
+  data?: MediaItem;
+}
+
+export interface ImportCommitResult {
+  added: number;
+  updated: number;
+  skipped: number;
   errors: string[];
 }

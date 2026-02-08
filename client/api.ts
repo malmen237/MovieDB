@@ -1,6 +1,6 @@
-import type { MediaItem, Stats, TMDBSearchResult, TMDBDetailsResult, ImportResult } from '../shared/types';
+import type { MediaItem, Stats, TMDBSearchResult, TMDBDetailsResult, ImportResult, ImportPreviewResult, ImportCommitItem, ImportCommitResult } from '../shared/types';
 
-export type { MediaItem, Stats, TMDBSearchResult, TMDBDetailsResult, ImportResult };
+export type { MediaItem, Stats, TMDBSearchResult, TMDBDetailsResult, ImportResult, ImportPreviewResult, ImportCommitItem, ImportCommitResult };
 
 const API_BASE = '/api';
 
@@ -135,6 +135,30 @@ export const api = {
       body: formData
     });
     if (!response.ok) throw new Error('Failed to import CSV');
+    return response.json();
+  },
+
+  async previewCSV(file: File, csvFormat: 'movies' | 'tv-series' = 'movies'): Promise<ImportPreviewResult> {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('csvFormat', csvFormat);
+
+    const response = await fetch(`${API_BASE}/import/csv/preview`, {
+      method: 'POST',
+      headers: userHeaders(),
+      body: formData
+    });
+    if (!response.ok) throw new Error('Failed to preview CSV');
+    return response.json();
+  },
+
+  async commitCSVImport(items: ImportCommitItem[]): Promise<ImportCommitResult> {
+    const response = await fetch(`${API_BASE}/import/csv/commit`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...userHeaders() },
+      body: JSON.stringify({ items })
+    });
+    if (!response.ok) throw new Error('Failed to commit import');
     return response.json();
   }
 };

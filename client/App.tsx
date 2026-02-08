@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { api, MediaItem, getCurrentUser, setCurrentUser } from './api';
 import { TMDB_REJECTED_ID } from '../shared/types';
 import { useDebounce } from './hooks/useDebounce';
@@ -22,7 +22,21 @@ function App() {
   const userInputRef = useRef<HTMLInputElement>(null);
   const addMenuRef = useRef<HTMLDivElement>(null);
 
+  const [formatFilter, setFormatFilter] = useState<Set<string>>(new Set());
+  const [formatMatchAll, setFormatMatchAll] = useState(false);
+
   const { media, stats, loading, error, setError, refresh } = useMediaData(view, debouncedSearch, user);
+
+  const filteredMedia = useMemo(() => {
+    if (formatFilter.size === 0) return media;
+    return media.filter(item => {
+      const itemFormats = item.format.split(',');
+      if (formatMatchAll) {
+        return [...formatFilter].every(f => itemFormats.includes(f));
+      }
+      return itemFormats.some(f => formatFilter.has(f));
+    });
+  }, [media, formatFilter, formatMatchAll]);
 
   const enrichStatus = useEnrichmentStream(refresh);
 
@@ -211,8 +225,37 @@ function App() {
               />
             </div>
 
+            <div className="format-filter-bar">
+              {['bluray', 'dvd', 'vhs', 'other'].map(f => (
+                <button
+                  key={f}
+                  className={`format-filter-btn ${formatFilter.has(f) ? 'active' : ''}`}
+                  onClick={() => {
+                    setFormatFilter(prev => {
+                      const next = new Set(prev);
+                      if (next.has(f)) next.delete(f);
+                      else next.add(f);
+                      return next;
+                    });
+                  }}
+                >
+                  {f.toUpperCase()}
+                </button>
+              ))}
+              {formatFilter.size >= 2 && (
+                <label className="format-match-all">
+                  <input
+                    type="checkbox"
+                    checked={formatMatchAll}
+                    onChange={(e) => setFormatMatchAll(e.target.checked)}
+                  />
+                  Match all
+                </label>
+              )}
+            </div>
+
             <MediaList
-              media={media}
+              media={filteredMedia}
               loading={loading}
               onDelete={handleDelete}
               onEdit={handleEdit}

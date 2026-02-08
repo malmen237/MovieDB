@@ -132,16 +132,34 @@ function MediaForm({ item, onSave, onCancel }: MediaFormProps) {
 
           <div className="form-group">
             <label>Format *</label>
-            <select
-              value={formData.format}
-              onChange={(e) =>
-                setFormData({ ...formData, format: e.target.value as 'bluray' | 'dvd' | 'other' })
-              }
-            >
-              <option value="bluray">Blu-ray</option>
-              <option value="dvd">DVD</option>
-              <option value="other">Other</option>
-            </select>
+            <div className="format-toggles">
+              {[
+                { value: 'bluray', label: 'Blu-ray' },
+                { value: 'dvd', label: 'DVD' },
+                { value: 'vhs', label: 'VHS' },
+                { value: 'other', label: 'Other' }
+              ].map(opt => {
+                const selected = (formData.format || '').split(',');
+                const isActive = selected.includes(opt.value);
+                return (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    className={`format-toggle ${isActive ? 'active' : ''}`}
+                    onClick={() => {
+                      const next = isActive
+                        ? selected.filter(v => v !== opt.value)
+                        : [...selected, opt.value];
+                      if (next.length > 0) {
+                        setFormData({ ...formData, format: next.filter(Boolean).join(',') });
+                      }
+                    }}
+                  >
+                    {opt.label}
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
           <div className="form-group">

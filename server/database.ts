@@ -22,7 +22,7 @@ export function initDatabase() {
       swedishTitle TEXT,
       company TEXT,
       director TEXT,
-      format TEXT NOT NULL CHECK(format IN ('bluray', 'dvd', 'other')),
+      format TEXT NOT NULL,
       productionYear INTEGER NOT NULL,
       extras TEXT,
       partOf TEXT,
@@ -58,6 +58,35 @@ export function initDatabase() {
       const seasonNumbers = match[1].split(',').map(s => s.trim()).join(',');
       migrateStmt.run(seasonNumbers, row.id);
     }
+  }
+
+  const tableInfo = db.prepare(`SELECT sql FROM sqlite_master WHERE type='table' AND name='media'`).get() as { sql: string } | undefined;
+  if (tableInfo && tableInfo.sql.includes("CHECK(format IN")) {
+    db.exec(`
+      CREATE TABLE media_new (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        userId TEXT NOT NULL,
+        type TEXT NOT NULL CHECK(type IN ('movie', 'tv-series')),
+        originalTitle TEXT NOT NULL,
+        swedishTitle TEXT,
+        company TEXT,
+        director TEXT,
+        format TEXT NOT NULL,
+        productionYear INTEGER NOT NULL,
+        extras TEXT,
+        seasons TEXT,
+        totalSeasons INTEGER,
+        partOf TEXT,
+        tmdbId INTEGER,
+        posterPath TEXT,
+        overview TEXT,
+        createdAt TEXT DEFAULT CURRENT_TIMESTAMP,
+        updatedAt TEXT DEFAULT CURRENT_TIMESTAMP
+      );
+      INSERT INTO media_new SELECT id, userId, type, originalTitle, swedishTitle, company, director, format, productionYear, extras, seasons, totalSeasons, partOf, tmdbId, posterPath, overview, createdAt, updatedAt FROM media;
+      DROP TABLE media;
+      ALTER TABLE media_new RENAME TO media;
+    `);
   }
 
   db.exec(`
