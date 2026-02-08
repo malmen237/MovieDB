@@ -11,12 +11,14 @@ A full-stack TypeScript application for managing your personal movie and TV seri
 - **TV Series Season Tracking**: Track which seasons you own vs. total available seasons
 - **CSV Import/Export**: Bulk import and export your collection as CSV, with separate formats for movies and TV series
 - **Multi-User Support**: Switch between users to manage separate collections
+- **Multi-Format Support**: A single item can have multiple formats (e.g. Blu-ray + DVD), stored as comma-separated values
 - **Search and Filter**: Find items by title, collection, or type (movie/TV series)
+- **Format Filtering**: Filter your collection by format (Blu-ray, DVD, VHS, Other) with OR/AND matching
 - **Statistics Dashboard**: View counts of movies, TV series, and total items
 - **Track Details**:
   - Original and Swedish titles
   - Director and production company
-  - Format (Blu-ray, DVD, or other)
+  - Format (Blu-ray, DVD, VHS, Other — multiple per item)
   - Production year
   - Special features/extras
   - Collection membership (e.g., "Lord of the Rings trilogy")
@@ -86,7 +88,7 @@ To import your existing collection from Excel or Google Sheets:
 |--------|----------|--------|
 | type | Yes | "movie" or "tv-series" |
 | originalTitle | Yes | Any text |
-| format | Yes | "bluray", "dvd", or "other" |
+| format | Yes | "bluray", "dvd", "vhs", "other" or comma-separated e.g. "bluray,dvd" |
 | productionYear | Yes | Year (number) |
 | swedishTitle | No | Any text |
 | company | No | Any text |
@@ -164,7 +166,7 @@ CREATE TABLE media (
   swedishTitle TEXT,
   company TEXT,
   director TEXT,
-  format TEXT NOT NULL CHECK(format IN ('bluray', 'dvd', 'other')),
+  format TEXT NOT NULL,
   productionYear INTEGER NOT NULL,
   extras TEXT,
   partOf TEXT,
