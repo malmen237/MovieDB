@@ -6,6 +6,7 @@ import { useDebounce } from './hooks/useDebounce';
 import { useMediaData } from './hooks/useMediaData';
 import { useEnrichmentStream } from './hooks/useEnrichmentStream';
 import MediaList from './components/MediaList';
+import MediaDetail from './components/MediaDetail';
 import MediaForm from './components/MediaForm';
 import ImportCSV from './components/ImportCSV';
 
@@ -23,6 +24,7 @@ function App() {
   const userInputRef = useRef<HTMLInputElement>(null);
   const addMenuRef = useRef<HTMLDivElement>(null);
 
+  const [detailItem, setDetailItem] = useState<MediaItem | null>(null);
   const [formatFilter, setFormatFilter] = useState<Set<string>>(new Set());
   const [formatMatchAll, setFormatMatchAll] = useState(false);
 
@@ -87,6 +89,7 @@ function App() {
   };
 
   const handleEdit = (item: MediaItem) => {
+    setDetailItem(null);
     setPreviousView(view as View);
     setEditingItem(item);
     setView('add');
@@ -273,8 +276,16 @@ function App() {
             <MediaList
               media={filteredMedia}
               loading={loading}
-              onSelect={handleEdit}
+              onSelect={setDetailItem}
             />
+
+            {detailItem && (
+              <MediaDetail
+                item={detailItem}
+                onClose={() => setDetailItem(null)}
+                onEdit={handleEdit}
+              />
+            )}
           </>
         )}
       </div>

@@ -42,13 +42,26 @@ export async function getTMDBDetails(id: number, type: 'movie' | 'tv'): Promise<
     const response = await axios.get<TMDBDetailsResult>(`${TMDB_BASE_URL}/${type}/${id}`, {
       params: {
         api_key: TMDB_API_KEY,
-        language: 'en-US'
+        language: 'en-US',
+        append_to_response: 'credits'
       }
     });
 
+    const data = response.data;
     return {
-      ...response.data,
-      poster_path: response.data.poster_path ? `${TMDB_IMAGE_BASE_URL}${response.data.poster_path}` : undefined
+      ...data,
+      poster_path: data.poster_path ? `${TMDB_IMAGE_BASE_URL}${data.poster_path}` : undefined,
+      seasons: data.seasons?.map(s => ({
+        ...s,
+        poster_path: s.poster_path ? `${TMDB_IMAGE_BASE_URL}${s.poster_path}` : undefined
+      })),
+      credits: data.credits ? {
+        cast: data.credits.cast?.map(c => ({
+          ...c,
+          profile_path: c.profile_path ? `${TMDB_IMAGE_BASE_URL}${c.profile_path}` : undefined
+        })),
+        crew: data.credits.crew
+      } : undefined
     };
   } catch (error) {
     console.error('TMDB API error:', error);

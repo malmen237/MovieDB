@@ -38,6 +38,31 @@ export interface TMDBResponse {
   results: TMDBSearchResult[];
 }
 
+export interface TMDBCastMember {
+  id: number;
+  name: string;
+  character: string;
+  profile_path?: string;
+  order: number;
+}
+
+export interface TMDBCrewMember {
+  id: number;
+  name: string;
+  job: string;
+  department: string;
+}
+
+export interface TMDBSeason {
+  id: number;
+  season_number: number;
+  name: string;
+  episode_count: number;
+  air_date?: string;
+  overview?: string;
+  poster_path?: string;
+}
+
 export interface TMDBDetailsResult {
   id: number;
   title?: string;
@@ -48,6 +73,13 @@ export interface TMDBDetailsResult {
   first_air_date?: string;
   number_of_seasons?: number;
   genres?: { id: number; name: string }[];
+  production_countries?: { iso_3166_1: string; name: string }[];
+  origin_country?: string[];
+  credits?: {
+    cast: TMDBCastMember[];
+    crew: TMDBCrewMember[];
+  };
+  seasons?: TMDBSeason[];
 }
 
 export interface Stats {
