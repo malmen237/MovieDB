@@ -48,6 +48,7 @@ function parseMovieRow(cols: string[], userId: string): MediaItem | null {
 
   return {
     userId,
+    section: 'video',
     type: 'movie',
     originalTitle: title,
     swedishTitle: swedish,
@@ -69,6 +70,7 @@ function parseTVSeriesRow(cols: string[], userId: string): MediaItem | null {
 
   return {
     userId,
+    section: 'video',
     type: 'tv-series',
     originalTitle: title,
     swedishTitle: title,

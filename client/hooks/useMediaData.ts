@@ -1,9 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import { api, MediaItem, Stats } from '../api';
 
-export function useMediaData(view: string, debouncedSearch: string, user: string) {
+export function useMediaData(view: string, debouncedSearch: string, user: string, section: string) {
   const [media, setMedia] = useState<MediaItem[]>([]);
-  const [stats, setStats] = useState<Stats>({ movies: 0, tvSeries: 0, total: 0 });
+  const [stats, setStats] = useState<Stats>({ counts: {}, total: 0 });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [refreshCount, setRefreshCount] = useState(0);
@@ -15,10 +15,10 @@ export function useMediaData(view: string, debouncedSearch: string, user: string
       try {
         setLoading(true);
         setError(null);
-        const type = view === 'movies' ? 'movie' : view === 'tv-series' ? 'tv-series' : undefined;
+        const type = view === 'all' ? undefined : view;
         const [items, s] = await Promise.all([
-          api.getMedia(type, debouncedSearch),
-          api.getStats(),
+          api.getMedia(type, debouncedSearch, section),
+          api.getStats(section),
         ]);
         if (!cancelled) {
           setMedia(items);
@@ -36,7 +36,7 @@ export function useMediaData(view: string, debouncedSearch: string, user: string
 
     load();
     return () => { cancelled = true; };
-  }, [view, debouncedSearch, user, refreshCount]);
+  }, [view, debouncedSearch, user, section, refreshCount]);
 
   const refresh = useCallback(() => {
     setRefreshCount(c => c + 1);

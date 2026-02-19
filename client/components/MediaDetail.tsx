@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api, MediaItem, TMDBDetailsResult } from '../api';
+import { SECTION_CONFIG, getSectionForType } from '../../shared/sections';
 
 interface MediaDetailProps {
   item: MediaItem;
@@ -32,6 +33,9 @@ const TOP_CAST_COUNT = 8;
 function MediaDetail({ item, onClose, onEdit }: MediaDetailProps) {
   const [tmdbDetails, setTmdbDetails] = useState<TMDBDetailsResult | null>(null);
 
+  const itemSection = item.section || getSectionForType(item.type) || 'video';
+  const sectionConfig = SECTION_CONFIG[itemSection];
+
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
@@ -41,6 +45,7 @@ function MediaDetail({ item, onClose, onEdit }: MediaDetailProps) {
   }, [onClose]);
 
   useEffect(() => {
+    if (!sectionConfig.hasEnrichment) return;
     if (!item.tmdbId || item.tmdbId <= 0) return;
     let cancelled = false;
     const tmdbType = item.type === 'movie' ? 'movie' : 'tv';
@@ -48,7 +53,7 @@ function MediaDetail({ item, onClose, onEdit }: MediaDetailProps) {
       if (!cancelled) setTmdbDetails(details);
     }).catch(() => {});
     return () => { cancelled = true; };
-  }, [item.tmdbId, item.type]);
+  }, [item.tmdbId, item.type, sectionConfig.hasEnrichment]);
 
   const directors = tmdbDetails?.credits?.crew.filter(c => c.job === 'Director') || [];
   const cast = tmdbDetails?.credits?.cast.slice(0, TOP_CAST_COUNT) || [];
@@ -82,7 +87,9 @@ function MediaDetail({ item, onClose, onEdit }: MediaDetailProps) {
               )}
               <div className="detail-row">
                 <span className="detail-label">Type:</span>
-                <span className="detail-value">{item.type === 'movie' ? 'Movie' : 'TV Series'}</span>
+                <span className="detail-value">
+                  {sectionConfig.types.find(t => t.value === item.type)?.label || item.type}
+                </span>
               </div>
               <div className="detail-row">
                 <span className="detail-label">Year:</span>
@@ -96,13 +103,13 @@ function MediaDetail({ item, onClose, onEdit }: MediaDetailProps) {
               )}
               {directors.length > 0 && (
                 <div className="detail-row">
-                  <span className="detail-label">Director:</span>
+                  <span className="detail-label">{sectionConfig.directorLabel}:</span>
                   <span className="detail-value">{directors.map(d => d.name).join(', ')}</span>
                 </div>
               )}
               {!directors.length && item.director && (
                 <div className="detail-row">
-                  <span className="detail-label">Director:</span>
+                  <span className="detail-label">{sectionConfig.directorLabel}:</span>
                   <span className="detail-value">{item.director}</span>
                 </div>
               )}
@@ -215,6 +222,16 @@ function MediaDetail({ item, onClose, onEdit }: MediaDetailProps) {
                 rel="noopener noreferrer"
               >
                 View on TMDB
+              </a>
+            )}
+            {sectionConfig.externalSearchUrl && (
+              <a
+                className="btn btn-secondary"
+                href={sectionConfig.externalSearchUrl(item.originalTitle, item.director)}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Search on Discogs
               </a>
             )}
           </div>

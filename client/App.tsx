@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { api, MediaItem, getCurrentUser, setCurrentUser } from './api';
 import { TMDB_REJECTED_ID } from '../shared/types';
-import { FORMATS } from '../shared/formats';
+import { SECTION_CONFIG, Section, ALL_SECTIONS } from '../shared/sections';
 import { useDebounce } from './hooks/useDebounce';
 import { useMediaData } from './hooks/useMediaData';
 import { useEnrichmentStream } from './hooks/useEnrichmentStream';
@@ -10,14 +10,13 @@ import MediaDetail from './components/MediaDetail';
 import MediaForm from './components/MediaForm';
 import ImportCSV from './components/ImportCSV';
 
-type View = 'all' | 'movies' | 'tv-series' | 'add' | 'csv';
-
 function App() {
-  const [view, setView] = useState<View>('all');
+  const [section, setSection] = useState<Section>('video');
+  const [view, setView] = useState('all');
   const [search, setSearch] = useState('');
   const debouncedSearch = useDebounce(search);
   const [editingItem, setEditingItem] = useState<MediaItem | null>(null);
-  const [previousView, setPreviousView] = useState<View>('all');
+  const [previousView, setPreviousView] = useState('all');
   const scrollTargetId = useRef<number | null>(null);
   const [user, setUser] = useState(getCurrentUser());
   const [addMenuOpen, setAddMenuOpen] = useState(false);
@@ -28,7 +27,9 @@ function App() {
   const [formatFilter, setFormatFilter] = useState<Set<string>>(new Set());
   const [formatMatchAll, setFormatMatchAll] = useState(false);
 
-  const { media, stats, loading, error, setError, refresh } = useMediaData(view, debouncedSearch, user);
+  const sectionConfig = SECTION_CONFIG[section];
+
+  const { media, stats, loading, error, setError, refresh } = useMediaData(view, debouncedSearch, user, section);
 
   const filteredMedia = useMemo(() => {
     if (formatFilter.size === 0) return media;
@@ -63,6 +64,13 @@ function App() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  const handleSectionSwitch = (newSection: Section) => {
+    setSection(newSection);
+    setView('all');
+    setFormatFilter(new Set());
+    setSearch('');
+  };
+
   const handleDelete = async (id: number) => {
     try {
       await api.deleteMedia(id);
@@ -90,7 +98,7 @@ function App() {
 
   const handleEdit = (item: MediaItem) => {
     setDetailItem(null);
-    setPreviousView(view as View);
+    setPreviousView(view);
     setEditingItem(item);
     setView('add');
   };
@@ -123,20 +131,31 @@ function App() {
     setView('all');
   };
 
+  const isListView = view !== 'add' && view !== 'csv';
+
   return (
     <div>
       <div className="header">
         <div className="header-left">
-          <span className="header-logo">Movie Database</span>
+          <span className="header-logo">Media Database</span>
+          <div className="section-tabs">
+            {ALL_SECTIONS.map(s => (
+              <button
+                key={s}
+                className={`section-tab ${section === s ? 'active' : ''}`}
+                onClick={() => handleSectionSwitch(s)}
+              >
+                {SECTION_CONFIG[s].label}
+              </button>
+            ))}
+          </div>
           <div className="stats">
-            <div className="stat-item">
-              <span>Movies:</span>
-              <strong>{stats.movies}</strong>
-            </div>
-            <div className="stat-item">
-              <span>TV Series:</span>
-              <strong>{stats.tvSeries}</strong>
-            </div>
+            {sectionConfig.types.map(t => (
+              <div key={t.value} className="stat-item">
+                <span>{t.label}:</span>
+                <strong>{stats.counts[t.value] || 0}</strong>
+              </div>
+            ))}
             <div className="stat-item">
               <span>Total:</span>
               <strong>{stats.total}</strong>
@@ -165,18 +184,15 @@ function App() {
           >
             All Items
           </button>
-          <button
-            className={view === 'movies' ? 'active' : ''}
-            onClick={() => setView('movies')}
-          >
-            Movies
-          </button>
-          <button
-            className={view === 'tv-series' ? 'active' : ''}
-            onClick={() => setView('tv-series')}
-          >
-            TV Series
-          </button>
+          {sectionConfig.types.map(t => (
+            <button
+              key={t.value}
+              className={view === t.value ? 'active' : ''}
+              onClick={() => setView(t.value)}
+            >
+              {t.label}
+            </button>
+          ))}
           <div className="add-menu-wrapper" ref={addMenuRef}>
             <button
               className={`add-menu-trigger ${addMenuOpen ? 'open' : ''}`}
@@ -189,15 +205,17 @@ function App() {
                 <button onClick={() => { setEditingItem(null); setView('add'); setAddMenuOpen(false); }}>
                   Add New
                 </button>
-                <button onClick={() => { setView('csv'); setAddMenuOpen(false); }}>
-                  Import / Export CSV
-                </button>
+                {sectionConfig.hasCsvSupport && (
+                  <button onClick={() => { setView('csv'); setAddMenuOpen(false); }}>
+                    Import / Export CSV
+                  </button>
+                )}
               </div>
             )}
           </div>
         </div>
 
-        {enrichStatus?.type === 'progress' && (
+        {section === 'video' && enrichStatus?.type === 'progress' && (
           <div className="message message-info">
             Fetching TMDB info... {enrichStatus.processed}/{enrichStatus.total}
           </div>
@@ -211,6 +229,7 @@ function App() {
 
         {view === 'add' && (
           <MediaForm
+            section={section}
             item={editingItem}
             onSave={handleSave}
             onCancel={handleCancel}
@@ -223,7 +242,7 @@ function App() {
           <ImportCSV onComplete={handleImportComplete} />
         )}
 
-        {view !== 'add' && view !== 'csv' && (
+        {isListView && (
           <>
             <div className="search-bar">
               <div className="search-input-wrapper">
@@ -246,7 +265,7 @@ function App() {
             </div>
 
             <div className="format-filter-bar">
-              {FORMATS.map(({ value, label }) => (
+              {sectionConfig.formats.map(({ value, label }) => (
                 <button
                   key={value}
                   className={`format-filter-btn ${formatFilter.has(value) ? 'active' : ''}`}

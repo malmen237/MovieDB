@@ -1,4 +1,5 @@
 import { MediaItem } from '../api';
+import { SECTION_CONFIG, getSectionForType } from '../../shared/sections';
 
 interface MediaListProps {
   media: MediaItem[];
@@ -26,6 +27,18 @@ function SeasonBadges({ seasons, totalSeasons }: { seasons?: string; totalSeason
   );
 }
 
+function getTypeLabel(item: MediaItem): string {
+  const section = item.section || getSectionForType(item.type) || 'video';
+  const config = SECTION_CONFIG[section];
+  const typeOption = config.types.find(t => t.value === item.type);
+  return typeOption?.label || item.type;
+}
+
+function getDirectorLabel(item: MediaItem): string {
+  const section = item.section || getSectionForType(item.type) || 'video';
+  return SECTION_CONFIG[section].directorLabel;
+}
+
 function MediaList({ media, loading, onSelect }: MediaListProps) {
   if (loading) {
     return <div className="loading">Loading...</div>;
@@ -35,7 +48,7 @@ function MediaList({ media, loading, onSelect }: MediaListProps) {
     return (
       <div className="empty-state">
         <h3>No items found</h3>
-        <p>Try adding some movies or TV series to your collection!</p>
+        <p>Try adding some items to your collection!</p>
       </div>
     );
   }
@@ -56,9 +69,7 @@ function MediaList({ media, loading, onSelect }: MediaListProps) {
               <h3 className="media-title">{item.swedishTitle || item.originalTitle}</h3>
               <p className="media-subtitle">{item.originalTitle}</p>
               <div>
-                <span className="media-badge">
-                  {item.type === 'movie' ? '📽️ Movie' : '📺 TV Series'}
-                </span>
+                <span className="media-badge">{getTypeLabel(item)}</span>
                 {item.format.split(',').map(f => (
                   <span key={f} className="media-badge">{f.toUpperCase()}</span>
                 ))}
@@ -68,7 +79,7 @@ function MediaList({ media, loading, onSelect }: MediaListProps) {
 
           <div className="media-details">
             <p><strong>Year:</strong> {item.productionYear}</p>
-            {item.director && <p><strong>Director:</strong> {item.director}</p>}
+            {item.director && <p><strong>{getDirectorLabel(item)}:</strong> {item.director}</p>}
             {item.company && <p><strong>Company:</strong> {item.company}</p>}
             {item.partOf && <p><strong>Part of:</strong> {item.partOf}</p>}
             {item.type === 'tv-series' && (item.seasons || item.totalSeasons) && (

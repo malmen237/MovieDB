@@ -60,7 +60,7 @@ body {
 .header-left {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 36px;
 }
 
 .header-logo {
@@ -113,6 +113,33 @@ body {
 
 .stat-item strong {
   color: var(--color-text-primary);
+}
+
+/* Section Tabs */
+.section-tabs {
+  display: flex;
+  gap: 2px;
+}
+
+.section-tab {
+  padding: 4px 14px;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--color-text-dimmed);
+  font-size: 0.88rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.section-tab:hover {
+  color: var(--color-accent);
+}
+
+.section-tab.active {
+  color: var(--color-accent);
+  border-bottom-color: var(--color-accent);
 }
 
 /* Navigation */

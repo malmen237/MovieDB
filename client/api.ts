@@ -19,10 +19,11 @@ function userHeaders(): Record<string, string> {
 }
 
 export const api = {
-  async getMedia(type?: string, search?: string): Promise<MediaItem[]> {
+  async getMedia(type?: string, search?: string, section?: string): Promise<MediaItem[]> {
     const params = new URLSearchParams();
     if (type) params.append('type', type);
     if (search) params.append('search', search);
+    if (section) params.append('section', section);
 
     const response = await fetch(`${API_BASE}/media?${params}`, {
       headers: userHeaders()
@@ -67,8 +68,10 @@ export const api = {
     if (!response.ok) throw new Error('Failed to delete media');
   },
 
-  async getStats(): Promise<Stats> {
-    const response = await fetch(`${API_BASE}/stats`, {
+  async getStats(section?: string): Promise<Stats> {
+    const params = new URLSearchParams();
+    if (section) params.append('section', section);
+    const response = await fetch(`${API_BASE}/stats?${params}`, {
       headers: userHeaders()
     });
     if (!response.ok) throw new Error('Failed to fetch stats');

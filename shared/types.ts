@@ -1,9 +1,12 @@
+import type { Section, MediaType } from './sections';
+
 export const TMDB_REJECTED_ID = -1;
 
 export interface MediaItem {
   id?: number;
   userId: string;
-  type: 'movie' | 'tv-series';
+  section: Section;
+  type: MediaType;
   originalTitle: string;
   swedishTitle?: string;
   company?: string;
@@ -83,8 +86,7 @@ export interface TMDBDetailsResult {
 }
 
 export interface Stats {
-  movies: number;
-  tvSeries: number;
+  counts: Record<string, number>;
   total: number;
 }
 

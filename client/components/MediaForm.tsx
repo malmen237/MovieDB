@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
 import { api, MediaItem, TMDBSearchResult } from '../api';
-import { FORMATS } from '../../shared/formats';
+import { SECTION_CONFIG, Section } from '../../shared/sections';
 import TMDBSearch from './TMDBSearch';
 
 interface MediaFormProps {
+  section: Section;
   item: MediaItem | null;
   onSave: () => void;
   onCancel: () => void;
@@ -11,10 +12,13 @@ interface MediaFormProps {
   onDismissTmdb?: (id: number) => void;
 }
 
-function MediaForm({ item, onSave, onCancel, onDelete, onDismissTmdb }: MediaFormProps) {
+function MediaForm({ section, item, onSave, onCancel, onDelete, onDismissTmdb }: MediaFormProps) {
+  const sectionConfig = SECTION_CONFIG[section];
+
   const [formData, setFormData] = useState<Partial<MediaItem>>({
-    type: 'movie',
-    format: 'bluray',
+    section,
+    type: sectionConfig.types[0].value,
+    format: sectionConfig.formats[0].value,
     productionYear: new Date().getFullYear(),
     originalTitle: '',
     swedishTitle: '',
@@ -35,6 +39,7 @@ function MediaForm({ item, onSave, onCancel, onDelete, onDismissTmdb }: MediaFor
     if (item) {
       setFormData({
         ...item,
+        section: item.section || section,
         swedishTitle: item.swedishTitle || '',
         company: item.company || '',
         director: item.director || '',
@@ -45,7 +50,7 @@ function MediaForm({ item, onSave, onCancel, onDelete, onDismissTmdb }: MediaFor
         overview: item.overview || '',
       });
     }
-  }, [item]);
+  }, [item, section]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -58,11 +63,12 @@ function MediaForm({ item, onSave, onCancel, onDelete, onDismissTmdb }: MediaFor
     }
 
     try {
+      const dataToSave = { ...formData, section };
       if (item?.id) {
-        await api.updateMedia(item.id, formData);
+        await api.updateMedia(item.id, dataToSave);
         setSuccess('Item updated successfully!');
       } else {
-        await api.addMedia(formData as MediaItem);
+        await api.addMedia(dataToSave as MediaItem);
         setSuccess('Item added successfully!');
       }
 
@@ -100,7 +106,7 @@ function MediaForm({ item, onSave, onCancel, onDelete, onDismissTmdb }: MediaFor
       {error && <div className="message message-error">{error}</div>}
       {success && <div className="message message-success">{success}</div>}
 
-      {!showTMDBSearch && (
+      {sectionConfig.hasEnrichment && !showTMDBSearch && (
         <div className="form-group">
           <button
             type="button"
@@ -128,18 +134,19 @@ function MediaForm({ item, onSave, onCancel, onDelete, onDismissTmdb }: MediaFor
             <select
               value={formData.type}
               onChange={(e) =>
-                setFormData({ ...formData, type: e.target.value as 'movie' | 'tv-series' })
+                setFormData({ ...formData, type: e.target.value as MediaItem['type'] })
               }
             >
-              <option value="movie">Movie</option>
-              <option value="tv-series">TV Series</option>
+              {sectionConfig.types.map(t => (
+                <option key={t.value} value={t.value}>{t.label}</option>
+              ))}
             </select>
           </div>
 
           <div className="form-group">
             <label>Format *</label>
             <div className="format-toggles">
-              {FORMATS.map(opt => {
+              {sectionConfig.formats.map(opt => {
                 const selected = (formData.format || '').split(',').filter(Boolean);
                 const isActive = selected.includes(opt.value);
                 const isLastActive = isActive && selected.length === 1;
@@ -202,7 +209,7 @@ function MediaForm({ item, onSave, onCancel, onDelete, onDismissTmdb }: MediaFor
 
         <div className="form-row">
           <div className="form-group">
-            <label>Director</label>
+            <label>{sectionConfig.directorLabel}</label>
             <input
               type="text"
               value={formData.director}

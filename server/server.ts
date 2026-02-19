@@ -109,7 +109,8 @@ app.get('/api/media', (req: Request, res: Response) => {
   try {
     const type = req.query.type as string | undefined;
     const search = req.query.search as string | undefined;
-    const items = getAllMedia(req.userId, type, search);
+    const section = req.query.section as string | undefined;
+    const items = getAllMedia(req.userId, type, search, section);
     res.json(items);
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch media items' });
@@ -146,7 +147,9 @@ app.post('/api/media', (req: Request, res: Response) => {
 
     const id = addMedia(item);
     const newItem = getMediaById(req.userId, id);
-    nudgeQueue(req.userId);
+    if (!item.section || item.section === 'video') {
+      nudgeQueue(req.userId);
+    }
     res.status(201).json(newItem);
   } catch (error) {
     res.status(500).json({ error: 'Failed to add media item' });
@@ -191,7 +194,8 @@ app.delete('/api/media/:id', (req: Request, res: Response) => {
 
 app.get('/api/stats', (req: Request, res: Response) => {
   try {
-    const stats = getStats(req.userId);
+    const section = req.query.section as string | undefined;
+    const stats = getStats(req.userId, section);
     res.json(stats);
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch statistics' });
@@ -200,7 +204,7 @@ app.get('/api/stats', (req: Request, res: Response) => {
 
 app.get('/api/export/movies', (req: Request, res: Response) => {
   try {
-    const items = getAllMedia(req.userId, 'movie');
+    const items = getAllMedia(req.userId, 'movie', undefined, 'video');
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
     res.setHeader('Content-Disposition', 'attachment; filename="movies.csv"');
     res.send(exportMoviesCSV(items));
@@ -211,7 +215,7 @@ app.get('/api/export/movies', (req: Request, res: Response) => {
 
 app.get('/api/export/tv-series', (req: Request, res: Response) => {
   try {
-    const items = getAllMedia(req.userId, 'tv-series');
+    const items = getAllMedia(req.userId, 'tv-series', undefined, 'video');
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
     res.setHeader('Content-Disposition', 'attachment; filename="tv-series.csv"');
     res.send(exportTVSeriesCSV(items));
